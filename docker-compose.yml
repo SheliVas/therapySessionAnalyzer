@@ -1,0 +1,8 @@
+services:
+  upload_service:
+    build:
+      context: .
+      dockerfile: Dockerfile.upload_service
+    container_name: upload_service
+    ports:
+      - "8000:8000"
