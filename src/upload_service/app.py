@@ -1,15 +1,27 @@
 from fastapi import FastAPI, UploadFile, File, status
 from pydantic import BaseModel
 import uuid
-from pathlib import Path 
+from pathlib import Path
+
+from src.upload_service.events import VideoEventPublisher, VideoUploadedEvent
+
 
 class VideoUploadResponse(BaseModel):
     video_id: str
     filename: str
 
 
-def create_app() -> FastAPI:
+class NoOpVideoEventPublisher:
+    def publish_video_uploaded(self, event: VideoUploadedEvent) -> None:
+        # Stub implementation: do nothing for now
+        pass
+
+
+def create_app(publisher: VideoEventPublisher | None = None) -> FastAPI:
     app = FastAPI(title="Upload Service")
+
+    if publisher is None:
+        publisher = NoOpVideoEventPublisher()
 
     @app.get("/health")
     def health_check():
@@ -28,6 +40,14 @@ def create_app() -> FastAPI:
         target_path = base_dir / file.filename
         content = await file.read()
         target_path.write_bytes(content)
+        
+        event = VideoUploadedEvent(
+            video_id=video_id,
+            filename=file.filename,
+            storage_path=str(target_path),
+        )
+
+        publisher.publish_video_uploaded(event)
 
         return VideoUploadResponse(
             video_id=video_id,
