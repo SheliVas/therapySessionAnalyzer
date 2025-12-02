@@ -9,10 +9,7 @@ from src.transcription_service.domain import (
 
 
 class TranscriptEventPublisher:
-    """Interface for publishing transcript created events."""
-
     def publish_transcript_created(self, event: TranscriptCreatedEvent) -> None:
-        """Publish a TranscriptCreatedEvent."""
         raise NotImplementedError
 
 
