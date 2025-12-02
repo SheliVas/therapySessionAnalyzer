@@ -4,3 +4,4 @@ pytest
 python-multipart
 httpx
 pydantic
+pika
