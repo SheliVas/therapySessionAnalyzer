@@ -7,7 +7,8 @@ services:
     ports:
       - "8000:8000"
     depends_on:
-      - rabbitmq
+      rabbitmq:
+        condition: service_healthy
     environment:
       RABBITMQ_HOST: ${RABBITMQ_HOST}
       RABBITMQ_PORT: ${RABBITMQ_PORT}
@@ -23,7 +24,8 @@ services:
       dockerfile: Dockerfile.audio_extractor
     container_name: audio_extractor_service
     depends_on:
-      - rabbitmq
+      rabbitmq:
+        condition: service_healthy
     environment:
       RABBITMQ_HOST: ${RABBITMQ_HOST}
       RABBITMQ_PORT: ${RABBITMQ_PORT}
@@ -32,6 +34,25 @@ services:
       RABBITMQ_QUEUE: video.uploaded
       AUDIO_OUTPUT_BASE_DIR: /app/data/audio
       AUDIO_EXTRACTED_QUEUE: audio.extracted
+    volumes:
+      - ./data:/app/data
+
+  transcription_service:
+    build:
+      context: .
+      dockerfile: Dockerfile.transcription_service
+    container_name: transcription_service
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: "5672"
+      RABBITMQ_USER: guest
+      RABBITMQ_PASS: guest
+      AUDIO_EXTRACTED_QUEUE: audio.extracted
+      TRANSCRIPT_CREATED_QUEUE: transcript.created
+      TRANSCRIPT_OUTPUT_BASE_DIR: /app/data/transcripts
     volumes:
       - ./data:/app/data
 
@@ -44,3 +65,8 @@ services:
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS}
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5

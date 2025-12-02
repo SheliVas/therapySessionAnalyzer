@@ -4,12 +4,22 @@ from pathlib import Path
 
 import pika.exceptions
 
-from src.audio_extractor_service.config import RabbitMQConsumerConfig
-from src.audio_extractor_service.rabbitmq_consumer import RabbitMQVideoUploadedConsumer
-from src.audio_extractor_service.rabbitmq_publisher import (
-    RabbitMQConfig as PublisherConfig,
-    RabbitMQAudioEventPublisher,
+from src.transcription_service.rabbitmq_consumer import (
+    RabbitMQConsumerConfig,
+    RabbitMQAudioExtractedConsumer,
 )
+from src.transcription_service.rabbitmq_publisher import (
+    RabbitMQConfig as PublisherConfig,
+    RabbitMQTranscriptEventPublisher,
+)
+from src.transcription_service.domain import TranscriptionBackend
+
+
+class StubTranscriptionBackend(TranscriptionBackend):
+    """Stub backend that returns a placeholder transcript."""
+
+    def transcribe(self, audio_path: Path) -> str:
+        return f"[Stub transcript for {audio_path.name}]"
 
 
 def main() -> None:
@@ -18,7 +28,7 @@ def main() -> None:
         port=int(os.environ["RABBITMQ_PORT"]),
         username=os.environ["RABBITMQ_USER"],
         password=os.environ["RABBITMQ_PASS"],
-        queue_name=os.environ.get("RABBITMQ_QUEUE", "video.uploaded"),
+        queue_name=os.environ.get("AUDIO_EXTRACTED_QUEUE", "audio.extracted"),
     )
 
     publisher_config = PublisherConfig(
@@ -26,15 +36,19 @@ def main() -> None:
         port=int(os.environ["RABBITMQ_PORT"]),
         username=os.environ["RABBITMQ_USER"],
         password=os.environ["RABBITMQ_PASS"],
-        queue_name=os.environ.get("AUDIO_EXTRACTED_QUEUE", "audio.extracted"),
+        queue_name=os.environ.get("TRANSCRIPT_CREATED_QUEUE", "transcript.created"),
     )
 
-    base_output_dir = Path(os.environ.get("AUDIO_OUTPUT_BASE_DIR", "/app/data/audio"))
-    publisher = RabbitMQAudioEventPublisher(publisher_config)
+    base_output_dir = Path(
+        os.environ.get("TRANSCRIPT_OUTPUT_BASE_DIR", "/app/data/transcripts")
+    )
+    publisher = RabbitMQTranscriptEventPublisher(publisher_config)
+    backend = StubTranscriptionBackend()
 
-    consumer = RabbitMQVideoUploadedConsumer(
+    consumer = RabbitMQAudioExtractedConsumer(
         config=consumer_config,
         base_output_dir=base_output_dir,
+        backend=backend,
         publisher=publisher,
     )
 
@@ -43,7 +57,9 @@ def main() -> None:
 
     for attempt in range(max_retries):
         try:
-            print(f"Attempting to connect to RabbitMQ (attempt {attempt + 1}/{max_retries})...")
+            print(
+                f"Attempting to connect to RabbitMQ (attempt {attempt + 1}/{max_retries})..."
+            )
             consumer.run_forever()
             break
         except pika.exceptions.AMQPConnectionError:
