@@ -1,9 +1,8 @@
 from pathlib import Path
 
 from src.audio_extractor_service.config import load_config
-from src.audio_extractor_service.rabbitmq_consumer import (
-    RabbitMQVideoUploadedConsumer,
-)
+from src.audio_extractor_service.rabbitmq_consumer import RabbitMQVideoUploadedConsumer
+from src.audio_extractor_service.rabbitmq_publisher import RabbitMQAudioEventPublisher
 from src.audio_extractor_service.worker import AudioEventPublisher, AudioExtractedEvent
 
 
@@ -14,13 +13,12 @@ class LoggingAudioEventPublisher(AudioEventPublisher):
 
 
 def main() -> None:
-    cfg = load_config()
+    config = load_config()
 
-    publisher = LoggingAudioEventPublisher()
-
+    publisher = RabbitMQAudioEventPublisher(config.publisher)
     consumer = RabbitMQVideoUploadedConsumer(
-        config=cfg.rabbitmq,
-        base_output_dir=cfg.base_output_dir,
+        config=config.consumer,
+        base_output_dir=config.base_output_dir,
         publisher=publisher,
     )
 

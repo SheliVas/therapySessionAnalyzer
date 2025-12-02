@@ -31,6 +31,7 @@ services:
       RABBITMQ_PASS: guest
       RABBITMQ_QUEUE: video.uploaded
       AUDIO_OUTPUT_BASE_DIR: /app/data/audio
+      AUDIO_EXTRACTED_QUEUE: audio.extracted
     volumes:
       - ./data:/app/data
 
