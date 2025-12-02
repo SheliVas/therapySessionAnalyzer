@@ -79,7 +79,7 @@ def fake_publisher() -> FakeAudioEventPublisher:
 @pytest.fixture
 def fake_channel() -> MagicMock:
     channel = MagicMock()
-    channel._consume_callback: Callable | None = None
+    channel._consume_callback = None
 
     def capture_basic_consume(queue, on_message_callback, auto_ack=False):
         channel._consume_callback = on_message_callback
