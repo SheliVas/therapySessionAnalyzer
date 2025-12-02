@@ -4,6 +4,9 @@ import uuid
 from pathlib import Path
 
 from src.upload_service.events import VideoEventPublisher, VideoUploadedEvent
+from src.upload_service.config import get_rabbitmq_config
+from src.upload_service.rabbitmq_publisher import RabbitMQVideoEventPublisher
+
 
 
 class VideoUploadResponse(BaseModel):
@@ -15,6 +18,12 @@ class NoOpVideoEventPublisher:
     def publish_video_uploaded(self, event: VideoUploadedEvent) -> None:
         # Stub implementation: do nothing for now
         pass
+
+
+def create_production_app() -> FastAPI:
+    config = get_rabbitmq_config()
+    publisher = RabbitMQVideoEventPublisher(config)
+    return create_app(publisher)
 
 
 def create_app(publisher: VideoEventPublisher | None = None) -> FastAPI:
