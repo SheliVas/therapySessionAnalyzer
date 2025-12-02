@@ -1,36 +1,63 @@
 from fastapi.testclient import TestClient
 from uuid import UUID
 from pathlib import Path
+
+import pytest
+
 from src.upload_service.app import create_app
+from src.upload_service.events import VideoEventPublisher, VideoUploadedEvent
 
-from src.upload_service.app import app
-from src.upload_service.events import VideoUploadedEvent
 
-# - **upload_service** (FastAPI)
-#   - Endpoint: `POST /videos`
-#   - Accepts video file upload.
-#   - Stores raw video in MinIO (e.g., bucket `therapy-videos`).
-#   - Publishes RabbitMQ event `video.uploaded` with payload: video ID, MinIO path, metadata.
+# --- Fixtures ---
 
-some_filename = "session1.mp4"
-some_file_content = b"fake-video-content"
-some_file_mimetype = "video/mp4"
+@pytest.fixture
+def some_filename() -> str:
+    return "session1.mp4"
 
-class FakeVideoEventPublisher:
+
+@pytest.fixture
+def some_file_content() -> bytes:
+    return b"fake-video-content"
+
+
+@pytest.fixture
+def some_file_mimetype() -> str:
+    return "video/mp4"
+
+
+class FakeVideoEventPublisher(VideoEventPublisher):
     def __init__(self) -> None:
-        self.published_events: list[VideoUploadedEvent] = []
+        self.published: list[VideoUploadedEvent] = []
 
     def publish_video_uploaded(self, event: VideoUploadedEvent) -> None:
-        self.published_events.append(event)
+        self.published.append(event)
 
 
-def test_should_return_201_and_video_info_when_file_uploaded():
-    client = TestClient(app)
+@pytest.fixture
+def fake_publisher() -> FakeVideoEventPublisher:
+    return FakeVideoEventPublisher()
 
-    files = {
+
+@pytest.fixture
+def client(fake_publisher: FakeVideoEventPublisher) -> TestClient:
+    app = create_app(fake_publisher)
+    return TestClient(app)
+
+
+@pytest.fixture
+def files(some_filename: str, some_file_content: bytes, some_file_mimetype: str) -> dict:
+    return {
         "file": (some_filename, some_file_content, some_file_mimetype),
     }
 
+
+# --- Tests ---
+
+def test_should_return_201_and_video_info_when_file_uploaded(
+    client: TestClient,
+    files: dict,
+    some_filename: str,
+):
     response = client.post("/videos", files=files)
 
     assert response.status_code == 201, f"expected 201, got {response.status_code}"
@@ -48,21 +75,23 @@ def test_should_return_201_and_video_info_when_file_uploaded():
     assert body["filename"] == some_filename, f"expected filename '{some_filename}', got '{body['filename']}'"
 
 
-def test_should_return_422_when_file_field_missing():
-    client = TestClient(app)
-
+def test_should_return_422_when_file_field_missing(client: TestClient):
     response = client.post("/videos", files={})
 
     assert response.status_code == 422, f"expected 422, got {response.status_code}"
 
 
-def test_should_save_uploaded_file_to_disk_when_video_uploaded(tmp_path, monkeypatch):
+def test_should_save_uploaded_file_to_disk_when_video_uploaded(
+    tmp_path: Path,
+    monkeypatch,
+    fake_publisher: FakeVideoEventPublisher,
+    files: dict,
+    some_filename: str,
+    some_file_content: bytes,
+):
     monkeypatch.chdir(tmp_path)
+    app = create_app(fake_publisher)
     client = TestClient(app)
-
-    files = {
-        "file": (some_filename, some_file_content, some_file_mimetype),
-    }
 
     response = client.post("/videos", files=files)
 
@@ -80,16 +109,16 @@ def test_should_save_uploaded_file_to_disk_when_video_uploaded(tmp_path, monkeyp
     assert contents == some_file_content, f"expected file contents {some_file_content}, got {contents}"
 
 
-def test_should_publish_video_uploaded_event_when_video_uploaded(tmp_path, monkeypatch):
+def test_should_publish_video_uploaded_event_when_video_uploaded(
+    tmp_path: Path,
+    monkeypatch,
+    fake_publisher: FakeVideoEventPublisher,
+    files: dict,
+    some_filename: str,
+):
     monkeypatch.chdir(tmp_path)
-
-    fake_publisher = FakeVideoEventPublisher()
     app = create_app(fake_publisher)
     client = TestClient(app)
-
-    files = {
-        "file": (some_filename, some_file_content, some_file_mimetype),
-    }
 
     response = client.post("/videos", files=files)
 
@@ -99,9 +128,9 @@ def test_should_publish_video_uploaded_event_when_video_uploaded(tmp_path, monke
     UUID(video_id)
     assert body["filename"] == some_filename, f"expected filename '{some_filename}', got '{body['filename']}'"
 
-    assert len(fake_publisher.published_events) == 1, f"expected 1 event, got {len(fake_publisher.published_events)}"
+    assert len(fake_publisher.published) == 1, f"expected 1 event, got {len(fake_publisher.published)}"
 
-    event = fake_publisher.published_events[0]
+    event = fake_publisher.published[0]
     assert event.video_id == video_id, f"expected video_id '{video_id}', got '{event.video_id}'"
     assert event.filename == some_filename, f"expected filename '{some_filename}', got '{event.filename}'"
 

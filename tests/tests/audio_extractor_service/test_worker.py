@@ -1,11 +1,51 @@
 from pathlib import Path
 
+import pytest
+
 from src.upload_service.events import VideoUploadedEvent
 from src.audio_extractor_service.domain import AudioExtractedEvent
 from src.audio_extractor_service.worker import (
     AudioEventPublisher,
     process_video_uploaded_event,
 )
+
+
+# --- Fixtures ---
+
+@pytest.fixture
+def video_bytes() -> bytes:
+    return b"fake-video-content"
+
+
+@pytest.fixture
+def video_id() -> str:
+    return "some-video-id"
+
+
+@pytest.fixture
+def filename() -> str:
+    return "some-video.mp4"
+
+
+@pytest.fixture
+def video_path(tmp_path: Path, filename: str, video_bytes: bytes) -> Path:
+    path = tmp_path / filename
+    path.write_bytes(video_bytes)
+    return path
+
+
+@pytest.fixture
+def base_output_dir(tmp_path: Path) -> Path:
+    return tmp_path / "data" / "audio_extractor_output"
+
+
+@pytest.fixture
+def event(video_id: str, filename: str, video_path: Path) -> VideoUploadedEvent:
+    return VideoUploadedEvent(
+        video_id=video_id,
+        filename=filename,
+        storage_path=str(video_path),
+    )
 
 
 class FakeAudioEventPublisher:
@@ -16,40 +56,31 @@ class FakeAudioEventPublisher:
         self.published_events.append(event)
 
 
-def _create_fake_video(tmp_path: Path) -> tuple[VideoUploadedEvent, bytes, Path, Path]:
-    video_bytes = b"fake-video-content"
-    video_id = "some-video-id"
-    filename = "some-video.mp4"
-
-    video_path = tmp_path / filename
-    video_path.write_bytes(video_bytes)
-
-    base_output_dir = tmp_path / "data" / "audio_extractor_output"
-
-    event = VideoUploadedEvent(
-        video_id=video_id,
-        filename=filename,
-        storage_path=str(video_path),
-    )
-
-    return event, video_bytes, base_output_dir, video_path
+@pytest.fixture
+def fake_publisher() -> FakeAudioEventPublisher:
+    return FakeAudioEventPublisher()
 
 
-def test_should_return_audio_extracted_event_and_write_audio_file(tmp_path: Path) -> None:
-    event, video_bytes, base_output_dir, _ = _create_fake_video(tmp_path)
-    publisher = FakeAudioEventPublisher()
+# --- Tests ---
 
-    result: AudioExtractedEvent = process_video_uploaded_event(
+def test_should_return_audio_extracted_event_and_write_audio_file(
+    event: VideoUploadedEvent,
+    base_output_dir: Path,
+    fake_publisher: FakeAudioEventPublisher,
+    video_id: str,
+    video_bytes: bytes,
+):
+    result = process_video_uploaded_event(
         event=event,
         base_output_dir=base_output_dir,
-        publisher=publisher,
+        publisher=fake_publisher,
     )
 
     assert isinstance(result, AudioExtractedEvent), f"expected AudioExtractedEvent, got {type(result)}"
-    assert result.video_id == event.video_id, f"expected video_id {event.video_id}, got {result.video_id}"
+    assert result.video_id == video_id, f"expected video_id {video_id}, got {result.video_id}"
 
     audio_path = Path(result.audio_path)
-    expected_audio_path = base_output_dir / event.video_id / "audio.mp3"
+    expected_audio_path = base_output_dir / video_id / "audio.mp3"
     assert audio_path == expected_audio_path, f"expected audio_path {expected_audio_path}, got {audio_path}"
     assert audio_path.is_file(), f"expected audio file at {audio_path}, but it does not exist"
 
@@ -57,18 +88,19 @@ def test_should_return_audio_extracted_event_and_write_audio_file(tmp_path: Path
     assert written_bytes == video_bytes, "expected audio file content to match video content"
 
 
-def test_should_publish_audio_extracted_event_via_publisher(tmp_path: Path) -> None:
-    event, _, base_output_dir, _ = _create_fake_video(tmp_path)
-    publisher = FakeAudioEventPublisher()
-
+def test_should_publish_audio_extracted_event_via_publisher(
+    event: VideoUploadedEvent,
+    base_output_dir: Path,
+    fake_publisher: FakeAudioEventPublisher,
+):
     result = process_video_uploaded_event(
         event=event,
         base_output_dir=base_output_dir,
-        publisher=publisher,
+        publisher=fake_publisher,
     )
 
-    assert len(publisher.published_events) == 1, "expected one published event"
+    assert len(fake_publisher.published_events) == 1, "expected one published event"
 
-    published_event = publisher.published_events[0]
+    published_event = fake_publisher.published_events[0]
     assert published_event.video_id == result.video_id, f"expected video_id {result.video_id}, got {published_event.video_id}"
     assert published_event.audio_path == result.audio_path, f"expected audio_path {result.audio_path}, got {published_event.audio_path}"
