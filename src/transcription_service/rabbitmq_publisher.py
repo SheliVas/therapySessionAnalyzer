@@ -8,8 +8,6 @@ from src.transcription_service.worker import TranscriptEventPublisher
 
 
 class RabbitMQConfig(BaseModel):
-    """Configuration for RabbitMQ connection."""
-
     host: str
     port: int
     username: str
@@ -18,13 +16,11 @@ class RabbitMQConfig(BaseModel):
 
 
 class RabbitMQTranscriptEventPublisher(TranscriptEventPublisher):
-    """RabbitMQ-backed publisher for TranscriptCreatedEvent."""
 
     def __init__(self, config: RabbitMQConfig) -> None:
         self._config = config
 
     def publish_transcript_created(self, event: TranscriptCreatedEvent) -> None:
-        """Publish a TranscriptCreatedEvent to RabbitMQ."""
         credentials = pika.PlainCredentials(
             self._config.username,
             self._config.password,
