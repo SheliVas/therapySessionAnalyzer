@@ -26,6 +26,7 @@ def repository_with_data(mongo_client, sample_documents):
     return MongoReportRepository(mongo_client)
 
 
+@pytest.mark.unit
 def test_should_list_all_videos_when_collection_has_documents(repository_with_data, sample_documents):
     videos = repository_with_data.list_videos()
     
@@ -33,6 +34,7 @@ def test_should_list_all_videos_when_collection_has_documents(repository_with_da
     assert all(isinstance(v, VideoSummary) for v in videos)
 
 
+@pytest.mark.unit
 @pytest.mark.parametrize("video_id, expected_word_count, expected_extra", [
     ("video-1", 10, {"foo": "bar"}),
     ("video-2", 20, {"foo": "baz"}),
@@ -51,6 +53,7 @@ def test_should_contain_correct_video_summaries(
     assert video.extra == expected_extra
 
 
+@pytest.mark.unit
 def test_should_return_empty_list_when_no_documents(mongo_client):
     repository = MongoReportRepository(mongo_client)
     videos = repository.list_videos()
@@ -58,6 +61,7 @@ def test_should_return_empty_list_when_no_documents(mongo_client):
     assert videos == []
 
 
+@pytest.mark.unit
 def test_should_return_video_summary_when_video_exists(repository_with_data):
     video = repository_with_data.get_video("video-1")
     
@@ -67,6 +71,7 @@ def test_should_return_video_summary_when_video_exists(repository_with_data):
     assert video.extra == {"foo": "bar"}
 
 
+@pytest.mark.unit
 def test_should_return_none_when_video_does_not_exist(repository_with_data):
     video = repository_with_data.get_video("missing-video")
     

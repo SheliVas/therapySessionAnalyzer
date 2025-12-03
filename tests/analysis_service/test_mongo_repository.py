@@ -10,15 +10,6 @@ def repository(mongo_client: mongomock.MongoClient) -> MongoAnalysisRepository:
     return MongoAnalysisRepository(client=mongo_client)
 
 
-@pytest.fixture
-def sample_event() -> AnalysisCompletedEvent:
-    return AnalysisCompletedEvent(
-        video_id="video-123",
-        word_count=42,
-        extra={"foo": "bar"},
-    )
-
-
 class TestMongoAnalysisRepository:
 
     @pytest.mark.parametrize("video_id, word_count, extra", [

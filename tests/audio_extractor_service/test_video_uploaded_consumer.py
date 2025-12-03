@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from typing import Callable, Any
 
 import pytest
 import pika
@@ -44,9 +45,59 @@ def message_body(video_id: str, filename: str, video_path: Path) -> bytes:
     }).encode("utf-8")
 
 
+@pytest.fixture
+def mock_channel_with_callback(mocker):
+    """Mock channel that captures the consume callback."""
+    channel = mocker.MagicMock()
+    channel._consume_callback = None
+
+    def capture_basic_consume(queue, on_message_callback, auto_ack=False):
+        channel._consume_callback = on_message_callback
+        return "consumer-tag"
+
+    channel.basic_consume.side_effect = capture_basic_consume
+    return channel
+
+
+@pytest.fixture
+def mock_connection_with_callback(mocker, mock_channel_with_callback):
+    """Mock connection that returns the callback-capturing channel."""
+    connection = mocker.MagicMock()
+    connection.channel.return_value = mock_channel_with_callback
+    return connection
+
+
+@pytest.fixture
+def started_consumer(
+    config: RabbitMQConsumerConfig,
+    base_output_dir: Path,
+    fake_publisher: FakeAudioEventPublisher,
+    mock_channel_with_callback,
+    mock_connection_with_callback,
+    mocker,
+) -> tuple[RabbitMQVideoUploadedConsumer, Any, Callable]:
+    """Fixture that sets up and starts a consumer, returning the consumer, channel, and callback."""
+    mocker.patch("pika.BlockingConnection", return_value=mock_connection_with_callback)
+    mock_channel_with_callback.start_consuming.side_effect = KeyboardInterrupt
+
+    consumer = RabbitMQVideoUploadedConsumer(
+        config=config,
+        base_output_dir=base_output_dir,
+        publisher=fake_publisher,
+    )
+
+    try:
+        consumer.run_forever()
+    except KeyboardInterrupt:
+        pass
+
+    return consumer, mock_channel_with_callback, mock_channel_with_callback._consume_callback
+
+
 # --- Tests ---
 
 
+@pytest.mark.unit
 def test_should_connect_with_correct_parameters(
     config: RabbitMQConsumerConfig,
     base_output_dir: Path,
@@ -78,6 +129,7 @@ def test_should_connect_with_correct_parameters(
     assert params.credentials.password == config.password
 
 
+@pytest.mark.unit
 def test_should_declare_queue_durable(
     config: RabbitMQConsumerConfig,
     base_output_dir: Path,
@@ -106,38 +158,16 @@ def test_should_declare_queue_durable(
     )
 
 
+@pytest.mark.unit
 def test_should_process_message_and_create_audio_file(
-    config: RabbitMQConsumerConfig,
-    base_output_dir: Path,
-    fake_publisher: FakeAudioEventPublisher,
-    mocker,
-    mock_connection,
-    mock_channel,
+    started_consumer: tuple,
     message_body: bytes,
     video_id: str,
     video_bytes: bytes,
+    base_output_dir: Path,
+    mocker,
 ):
-    mocker.patch("pika.BlockingConnection", return_value=mock_connection)
-    mock_channel.start_consuming.side_effect = KeyboardInterrupt
-
-    captured_callback = {}
-    def capture_basic_consume(queue, on_message_callback, auto_ack=False):
-        captured_callback['callback'] = on_message_callback
-        return "consumer-tag"
-    mock_channel.basic_consume.side_effect = capture_basic_consume
-
-    consumer = RabbitMQVideoUploadedConsumer(
-        config=config,
-        base_output_dir=base_output_dir,
-        publisher=fake_publisher,
-    )
-
-    try:
-        consumer.run_forever()
-    except KeyboardInterrupt:
-        pass
-
-    callback = captured_callback.get('callback')
+    consumer, mock_channel, callback = started_consumer
     assert callback is not None
 
     fake_method = mocker.MagicMock()
@@ -151,37 +181,15 @@ def test_should_process_message_and_create_audio_file(
     assert contents == video_bytes
 
 
+@pytest.mark.unit
 def test_should_publish_audio_extracted_event(
-    config: RabbitMQConsumerConfig,
-    base_output_dir: Path,
+    started_consumer: tuple,
     fake_publisher: FakeAudioEventPublisher,
-    mocker,
-    mock_connection,
-    mock_channel,
     message_body: bytes,
     video_id: str,
+    mocker,
 ):
-    mocker.patch("pika.BlockingConnection", return_value=mock_connection)
-    mock_channel.start_consuming.side_effect = KeyboardInterrupt
-
-    captured_callback = {}
-    def capture_basic_consume(queue, on_message_callback, auto_ack=False):
-        captured_callback['callback'] = on_message_callback
-        return "consumer-tag"
-    mock_channel.basic_consume.side_effect = capture_basic_consume
-
-    consumer = RabbitMQVideoUploadedConsumer(
-        config=config,
-        base_output_dir=base_output_dir,
-        publisher=fake_publisher,
-    )
-
-    try:
-        consumer.run_forever()
-    except KeyboardInterrupt:
-        pass
-
-    callback = captured_callback.get('callback')
+    consumer, mock_channel, callback = started_consumer
     assert callback is not None
 
     fake_method = mocker.MagicMock()
@@ -194,36 +202,13 @@ def test_should_publish_audio_extracted_event(
     assert event.video_id == video_id
 
 
+@pytest.mark.unit
 def test_should_acknowledge_message_after_processing(
-    config: RabbitMQConsumerConfig,
-    base_output_dir: Path,
-    fake_publisher: FakeAudioEventPublisher,
-    mocker,
-    mock_connection,
-    mock_channel,
+    started_consumer: tuple,
     message_body: bytes,
+    mocker,
 ):
-    mocker.patch("pika.BlockingConnection", return_value=mock_connection)
-    mock_channel.start_consuming.side_effect = KeyboardInterrupt
-
-    captured_callback = {}
-    def capture_basic_consume(queue, on_message_callback, auto_ack=False):
-        captured_callback['callback'] = on_message_callback
-        return "consumer-tag"
-    mock_channel.basic_consume.side_effect = capture_basic_consume
-
-    consumer = RabbitMQVideoUploadedConsumer(
-        config=config,
-        base_output_dir=base_output_dir,
-        publisher=fake_publisher,
-    )
-
-    try:
-        consumer.run_forever()
-    except KeyboardInterrupt:
-        pass
-
-    callback = captured_callback.get('callback')
+    consumer, mock_channel, callback = started_consumer
     assert callback is not None
 
     fake_method = mocker.MagicMock()
