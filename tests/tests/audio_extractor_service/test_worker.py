@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from src.upload_service.events import VideoUploadedEvent
+from src.upload_service.domain import VideoUploadedEvent
 from src.audio_extractor_service.domain import AudioExtractedEvent
 from src.audio_extractor_service.worker import (
     AudioEventPublisher,

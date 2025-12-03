@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 import pika
 import pytest
 
-from src.upload_service.events import VideoUploadedEvent
+from src.upload_service.domain import VideoUploadedEvent
 from src.upload_service.rabbitmq_publisher import (
     RabbitMQConfig,
     RabbitMQVideoEventPublisher,

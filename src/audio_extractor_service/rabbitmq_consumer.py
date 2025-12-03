@@ -4,7 +4,7 @@ from pathlib import Path
 import pika
 from pydantic import BaseModel
 
-from src.upload_service.events import VideoUploadedEvent
+from src.upload_service.domain import VideoUploadedEvent
 from src.audio_extractor_service.worker import AudioEventPublisher, process_video_uploaded_event
 
 

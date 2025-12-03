@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
 from src.upload_service.app import create_app
-from src.upload_service.events import VideoEventPublisher, VideoUploadedEvent
+from src.upload_service.domain import VideoEventPublisher, VideoUploadedEvent
 
 class FakeVideoEventPublisher(VideoEventPublisher):
     def __init__(self) -> None:

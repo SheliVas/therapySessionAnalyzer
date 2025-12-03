@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from src.upload_service.events import VideoUploadedEvent
+from src.upload_service.domain import VideoUploadedEvent
 from src.audio_extractor_service.domain import (
     AudioExtractedEvent,
     handle_video_uploaded,

@@ -2,7 +2,7 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
-from src.upload_service.events import VideoUploadedEvent
+from src.upload_service.domain import VideoUploadedEvent
 
 
 class AudioExtractedEvent(BaseModel):

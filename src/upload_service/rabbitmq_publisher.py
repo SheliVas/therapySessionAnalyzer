@@ -3,7 +3,7 @@ import json
 import pika
 from pydantic import BaseModel
 
-from src.upload_service.events import VideoUploadedEvent, VideoEventPublisher
+from src.upload_service.domain import VideoUploadedEvent, VideoEventPublisher
 
 
 class RabbitMQConfig(BaseModel):

@@ -3,7 +3,7 @@ from pydantic import BaseModel
 import uuid
 from pathlib import Path
 
-from src.upload_service.events import VideoEventPublisher, VideoUploadedEvent
+from src.upload_service.domain import VideoEventPublisher, VideoUploadedEvent
 from src.upload_service.config import get_rabbitmq_config
 from src.upload_service.rabbitmq_publisher import RabbitMQVideoEventPublisher
 
