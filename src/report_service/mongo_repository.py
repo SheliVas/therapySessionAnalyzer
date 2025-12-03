@@ -16,3 +16,9 @@ class MongoReportRepository:
     def list_videos(self) -> list[VideoSummary]:
         documents = list(self.collection.find())
         return [VideoSummary(**doc) for doc in documents]
+
+    def get_video(self, video_id: str) -> VideoSummary | None:
+        doc = self.collection.find_one({"video_id": video_id})
+        if doc:
+            return VideoSummary(**doc)
+        return None

@@ -62,3 +62,18 @@ def test_should_return_empty_list_when_no_documents(mongo_client):
     videos = repository.list_videos()
     
     assert videos == [], f"expected empty list, got {videos}"
+
+
+def test_should_return_video_summary_when_video_exists(repository_with_data):
+    video = repository_with_data.get_video("video-1")
+    
+    assert video is not None, "expected video to be found"
+    assert video.video_id == "video-1"
+    assert video.word_count == 10
+    assert video.extra == {"foo": "bar"}
+
+
+def test_should_return_none_when_video_does_not_exist(repository_with_data):
+    video = repository_with_data.get_video("missing-video")
+    
+    assert video is None, f"expected None, got {video}"
