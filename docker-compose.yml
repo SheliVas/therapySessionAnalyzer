@@ -56,6 +56,27 @@ services:
     volumes:
       - ./data:/app/data
 
+  analysis_service:
+    build:
+      context: .
+      dockerfile: Dockerfile.analysis_service
+    container_name: analysis_service
+    depends_on:
+      - rabbitmq
+      - mongo
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: "5672"
+      RABBITMQ_USER: guest
+      RABBITMQ_PASS: guest
+      TRANSCRIPT_CREATED_QUEUE: transcript.created
+      ANALYSIS_COMPLETED_QUEUE: analysis.completed
+      MONGO_URI: mongodb://mongo:27017/
+      MONGO_DB_NAME: therapy_analysis
+    volumes:
+      - ./data:/app/data
+
+
   rabbitmq:
     image: rabbitmq:3-management
     container_name: rabbitmq
@@ -70,3 +91,10 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+  mongo:
+    image: mongo:7
+    container_name: mongo
+    ports:
+      - "27017:27017"
+
