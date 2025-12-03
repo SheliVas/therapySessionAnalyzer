@@ -35,12 +35,12 @@ All services are Python, each in its own Docker container, communicating only vi
     - Topic sentiment distribution over time.
     - Topics that make the patient feel good/bad.
     - Talk-time ratio therapist vs patient.
-  - Persists structured results into SQLite.
+  - Persists structured results into MongoDB (database `therapy_analysis`).
   - Publishes `analysis.completed` with video/analysis IDs.
 
 - **report_service** (FastAPI)
   - Endpoints:
-    - `GET /videos` – list analyzed videos from SQLite.
+    - `GET /videos` – list analyzed videos from MongoDB.
     - `GET /videos/{video_id}` – full analysis for a given video.
   - Can also expose aggregated stats across sessions.
 
@@ -56,40 +56,76 @@ All services are Python, each in its own Docker container, communicating only vi
   - Extracted audio (bucket `therapy-audio`).
   - Transcripts (bucket `therapy-transcripts`).
 - **Redis** – cache for LLM responses.
-- **SQLite** – main DB for analysis results, shared between `analysis_service` and `report_service`.
+- **MongoDB** – main DB for analysis results (database `therapy_analysis`), shared between `analysis_service` and `report_service`.
 - **Datadog** – centralized logging/metrics; services log to stdout with Datadog-compatible format.
 
-## SQLite Schema (Draft)
+## MongoDB Collections (Draft)
 
-Single database file, e.g. `/data/therapy_analysis.db`, mounted in `analysis_service` and `report_service`.
+Database: `therapy_analysis`
 
-- **videos**
-  - `id` (TEXT PRIMARY KEY, e.g., UUID)
-  - `filename` (TEXT)
-  - `uploaded_at` (TIMESTAMP)
-  - `video_minio_path` (TEXT)
-  - `audio_minio_path` (TEXT NULL)
-  - `transcript_minio_path` (TEXT NULL)
-  - `status` (TEXT: `uploaded` / `audio_extracted` / `transcribed` / `analyzed` / `failed`)
+- **Collection: `videos`**
 
-- **utterances**
-  - `id` (INTEGER PRIMARY KEY AUTOINCREMENT)
-  - `video_id` (TEXT REFERENCES `videos`(id))
-  - `speaker_label` (TEXT, e.g., `speaker_0`)
-  - `role` (TEXT: `therapist` / `patient` / `unknown`)
-  - `start_time` (REAL seconds)
-  - `end_time` (REAL seconds)
-  - `text` (TEXT)
-  - `topic` (TEXT)
-  - `emotion` (TEXT)
+    {
+      "_id": "uuid",  // video_id
+      "filename": "session1.mp4",
+      "uploaded_at": "2025-11-25T12:34:56Z",
+      "video_minio_path": "therapy-videos/videos/session1.mp4",
+      "audio_minio_path": "therapy-audio/audio/session1.mp3",
+      "transcript_minio_path": "therapy-transcripts/transcripts/session1.json",
+      "status": "analyzed"  // uploaded / audio_extracted / transcribed / analyzed / failed
+    }
 
-- **video_metrics**
-  - `video_id` (TEXT PRIMARY KEY REFERENCES `videos`(id))
-  - `patient_positive_topics` (TEXT JSON)
-  - `patient_negative_topics` (TEXT JSON)
-  - `talk_time_therapist` (REAL)
-  - `talk_time_patient` (REAL)
-  - `extra_metrics` (TEXT JSON) – for additional analysis (e.g., emotion timeline, topic histograms).
+- **Collection: `analysis_results`**
+
+    {
+      "_id": "ObjectId",
+      "video_id": "uuid",
+      "word_count": 1234,
+      "utterances": [
+        {
+          "speaker_label": "speaker_0",
+          "role": "therapist",
+          "start_time": 0.0,
+          "end_time": 5.2,
+          "text": "How are you feeling today?",
+          "topic": "greeting",
+          "emotion": "neutral"
+        },
+        {
+          "speaker_label": "speaker_1",
+          "role": "patient",
+          "start_time": 5.5,
+          "end_time": 12.3,
+          "text": "I've been feeling anxious lately.",
+          "topic": "anxiety",
+          "emotion": "anxious"
+        }
+      ],
+      "metrics": {
+        "talk_time_therapist": 120.5,
+        "talk_time_patient": 245.3,
+        "patient_positive_topics": ["progress", "coping_strategies"],
+        "patient_negative_topics": ["anxiety", "work_stress"]
+      },
+      "extra": {
+        "emotion_timeline": [
+          {"time_window": "0-60", "dominant_emotion": "neutral"},
+          {"time_window": "60-120", "dominant_emotion": "anxious"}
+        ],
+        "topic_histogram": {
+          "anxiety": {"positive": 2, "negative": 5},
+          "work": {"positive": 1, "negative": 3}
+        }
+      },
+      "created_at": "2025-11-25T12:45:00Z"
+    }
+
+**Indexes**
+
+- `videos`: index on `status`, index on `_id` (default)
+- `analysis_results`:
+  - index on `video_id` (unique, one analysis per video)
+  - optional compound index on `video_id` + `created_at` if you ever store multiple versions
 
 ## RabbitMQ Event Payloads (Draft)
 
@@ -143,10 +179,10 @@ Under `therapySessionAnalyzer/`:
 - `analysis_service/`
   - `analysis_worker.py`
   - `domain/` (transcript parsing, LLM client, metrics, etc.)
-  - `db/` (SQLite models/repository)
+  - `db/` (MongoDB models/repository for `analysis_results` and videos view)
 - `report_service/`
   - `report_service_api.py` (FastAPI app)
-  - `db/` (read-only repository into SQLite)
+  - `db/` (read-only repository into MongoDB)
 - `shared/`
   - `messaging.py` (event models)
   - `logging_config.py` (central logging setup)
@@ -159,10 +195,10 @@ Under `therapySessionAnalyzer/`:
    - Transcript parsing (AssemblyAI JSON → utterances).
    - LLM client with Redis cache mocked.
    - Metrics computation (talk time, topic/emotion aggregation).
-   - SQLite repository (using `:memory:` in tests).
+  - MongoDB repository (using `mongomock` or in-memory MongoDB in tests).
 2. Add message-handling units for RabbitMQ events with the broker mocked.
 3. Add FastAPI endpoints for `upload_service` and `report_service` with HTTP tests.
-4. Finally, wire everything together with Docker Compose, MinIO, RabbitMQ, Redis, SQLite volume, and Datadog.
+4. Finally, wire everything together with Docker Compose, MinIO, RabbitMQ, Redis, MongoDB, and Datadog.
 
 ## Extra Analysis Idea
 
