@@ -1,42 +1,8 @@
 import pytest
 
 from src.transcription_service.domain import TranscriptCreatedEvent
-from src.analysis_service.domain import AnalysisBackend, AnalysisResult, analyze_transcript
-
-
-class FakeAnalysisBackend(AnalysisBackend):
-
-    def __init__(self) -> None:
-        self.calls: list[str] = []
-
-    def analyze(self, transcript_text: str) -> AnalysisResult:
-        self.calls.append(transcript_text)
-        word_count = len(transcript_text.split())
-        return AnalysisResult(
-            video_id="video-123",
-            word_count=word_count,
-            extra={"backend": "fake"}
-        )
-
-
-@pytest.fixture
-def fake_transcript_path(tmp_path) -> str:
-    transcript_file = tmp_path / "transcript.txt"
-    transcript_file.write_text("hello world hello")
-    return str(transcript_file)
-
-
-@pytest.fixture
-def event(fake_transcript_path: str) -> TranscriptCreatedEvent:
-    return TranscriptCreatedEvent(
-        video_id="video-123",
-        transcript_path=fake_transcript_path,
-    )
-
-
-@pytest.fixture
-def fake_backend() -> FakeAnalysisBackend:
-    return FakeAnalysisBackend()
+from src.analysis_service.domain import analyze_transcript
+from tests.analysis_service.conftest import FakeAnalysisBackend
 
 
 def test_should_call_backend_analyze_once(

@@ -1,11 +1,5 @@
 import pytest
-import mongomock
 from src.report_service.mongo_repository import VideoSummary, MongoReportRepository
-
-
-@pytest.fixture
-def mongo_client():
-    return mongomock.MongoClient()
 
 
 @pytest.fixture
