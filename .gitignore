@@ -128,3 +128,6 @@ Desktop.ini
 .envrc
 .env.local
 secrets.*
+
+# Copilot instructions (generated)
+.github/copilot-instructions.md
