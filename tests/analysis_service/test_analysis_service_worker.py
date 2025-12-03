@@ -6,6 +6,7 @@ from src.analysis_service.domain import AnalysisBackend, AnalysisResult, analyze
 from src.analysis_service.worker import (
     AnalysisCompletedEvent,
     AnalysisEventPublisher,
+    AnalysisRepository,
     process_transcript_created_event,
 )
 
@@ -33,6 +34,15 @@ class FakeAnalysisEventPublisher(AnalysisEventPublisher):
 
     def publish_analysis_completed(self, event: AnalysisCompletedEvent) -> None:
         self.published_events.append(event)
+
+
+class FakeAnalysisRepository(AnalysisRepository):
+
+    def __init__(self) -> None:
+        self.saved_events: list[AnalysisCompletedEvent] = []
+
+    def save_analysis(self, event: AnalysisCompletedEvent) -> None:
+        self.saved_events.append(event)
 
 
 @pytest.fixture
@@ -65,12 +75,18 @@ def fake_publisher() -> FakeAnalysisEventPublisher:
     return FakeAnalysisEventPublisher()
 
 
+@pytest.fixture
+def fake_repository() -> FakeAnalysisRepository:
+    return FakeAnalysisRepository()
+
+
 def test_should_call_backend_analyze_once(
     event: TranscriptCreatedEvent,
     fake_backend: FakeAnalysisBackend,
     fake_publisher: FakeAnalysisEventPublisher,
+    fake_repository: FakeAnalysisRepository,
 ) -> None:
-    process_transcript_created_event(event, fake_backend, fake_publisher)
+    process_transcript_created_event(event, fake_backend, fake_publisher, fake_repository)
 
     expected_calls = 1
     actual_calls = len(fake_backend.calls)
@@ -85,8 +101,9 @@ def test_should_return_analysis_completed_event_with_video_id_matching_event(
     event: TranscriptCreatedEvent,
     fake_backend: FakeAnalysisBackend,
     fake_publisher: FakeAnalysisEventPublisher,
+    fake_repository: FakeAnalysisRepository,
 ) -> None:
-    result = process_transcript_created_event(event, fake_backend, fake_publisher)
+    result = process_transcript_created_event(event, fake_backend, fake_publisher, fake_repository)
 
     expected_video_id = event.video_id
     actual_video_id = result.video_id
@@ -97,8 +114,9 @@ def test_should_return_analysis_completed_event_with_correct_word_count(
     event: TranscriptCreatedEvent,
     fake_backend: FakeAnalysisBackend,
     fake_publisher: FakeAnalysisEventPublisher,
+    fake_repository: FakeAnalysisRepository,
 ) -> None:
-    result = process_transcript_created_event(event, fake_backend, fake_publisher)
+    result = process_transcript_created_event(event, fake_backend, fake_publisher, fake_repository)
 
     expected_word_count = 3
     actual_word_count = result.word_count
@@ -109,8 +127,9 @@ def test_should_return_analysis_completed_event_with_correct_extra_data(
     event: TranscriptCreatedEvent,
     fake_backend: FakeAnalysisBackend,
     fake_publisher: FakeAnalysisEventPublisher,
+    fake_repository: FakeAnalysisRepository,
 ) -> None:
-    result = process_transcript_created_event(event, fake_backend, fake_publisher)
+    result = process_transcript_created_event(event, fake_backend, fake_publisher, fake_repository)
 
     expected_extra = {"backend": "fake"}
     actual_extra = result.extra
@@ -121,8 +140,9 @@ def test_should_publish_exactly_one_event_equal_to_returned_event(
     event: TranscriptCreatedEvent,
     fake_backend: FakeAnalysisBackend,
     fake_publisher: FakeAnalysisEventPublisher,
+    fake_repository: FakeAnalysisRepository,
 ) -> None:
-    result = process_transcript_created_event(event, fake_backend, fake_publisher)
+    result = process_transcript_created_event(event, fake_backend, fake_publisher, fake_repository)
 
     expected_count = 1
     actual_count = len(fake_publisher.published_events)
@@ -131,3 +151,20 @@ def test_should_publish_exactly_one_event_equal_to_returned_event(
     expected_event = result
     actual_event = fake_publisher.published_events[0]
     assert actual_event == expected_event, f"expected published event {expected_event}, got {actual_event}"
+
+
+def test_should_save_exactly_one_event_equal_to_returned_event(
+    event: TranscriptCreatedEvent,
+    fake_backend: FakeAnalysisBackend,
+    fake_publisher: FakeAnalysisEventPublisher,
+    fake_repository: FakeAnalysisRepository,
+) -> None:
+    result = process_transcript_created_event(event, fake_backend, fake_publisher, fake_repository)
+
+    expected_count = 1
+    actual_count = len(fake_repository.saved_events)
+    assert actual_count == expected_count, f"expected {expected_count} saved event, got {actual_count}"
+
+    expected_event = result
+    actual_event = fake_repository.saved_events[0]
+    assert actual_event == expected_event, f"expected saved event {expected_event}, got {actual_event}"
