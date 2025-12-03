@@ -49,17 +49,11 @@ def test_should_connect_with_correct_parameters(
 
     mock_pika.assert_called_once()
     params = mock_pika.call_args[0][0]
-    assert isinstance(params, pika.ConnectionParameters), (
-        f"expected pika.ConnectionParameters, got {type(params)}"
-    )
-    assert params.host == config.host, f"expected host {config.host}, got {params.host}"
-    assert params.port == config.port, f"expected port {config.port}, got {params.port}"
-    assert params.credentials.username == config.username, (
-        f"expected username {config.username}, got {params.credentials.username}"
-    )
-    assert params.credentials.password == config.password, (
-        f"expected password {config.password}, got {params.credentials.password}"
-    )
+    assert isinstance(params, pika.ConnectionParameters)
+    assert params.host == config.host
+    assert params.port == config.port
+    assert params.credentials.username == config.username
+    assert params.credentials.password == config.password
 
 
 @pytest.mark.unit
@@ -97,20 +91,12 @@ def test_should_publish_event_as_json_to_correct_queue(
     mock_channel.basic_publish.assert_called_once()
     call_kwargs = mock_channel.basic_publish.call_args.kwargs
 
-    assert call_kwargs.get("exchange") == "", (
-        f"expected exchange to be '', got {call_kwargs.get('exchange')}"
-    )
-    assert call_kwargs.get("routing_key") == config.queue_name, (
-        f"expected routing_key to be {config.queue_name}, got {call_kwargs.get('routing_key')}"
-    )
+    assert call_kwargs.get("exchange") == ""
+    assert call_kwargs.get("routing_key") == config.queue_name
 
     body_dict = json.loads(call_kwargs.get("body"))
-    assert body_dict["video_id"] == event.video_id, (
-        f"expected video_id {event.video_id}, got {body_dict['video_id']}"
-    )
-    assert body_dict["transcript_path"] == event.transcript_path, (
-        f"expected transcript_path {event.transcript_path}, got {body_dict['transcript_path']}"
-    )
+    assert body_dict["video_id"] == event.video_id
+    assert body_dict["transcript_path"] == event.transcript_path
 
 
 @pytest.mark.unit

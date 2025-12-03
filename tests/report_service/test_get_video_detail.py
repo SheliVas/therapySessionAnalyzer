@@ -11,7 +11,7 @@ import pytest
 ])
 def test_get_video_success(client, video_id, expected_word_count, expected_extra):
     response = client.get(f"/videos/{video_id}")
-    assert response.status_code == 200, f"Expected 200, got {response.status_code}"
+    assert response.status_code == 200
     data = response.json()
     assert data["video_id"] == video_id
     assert data["word_count"] == expected_word_count

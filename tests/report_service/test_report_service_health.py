@@ -8,5 +8,5 @@ def test_health_endpoint_returns_ok():
 
     response = client.get("/health")
 
-    assert response.status_code == 200, f"expected status code 200, got {response.status_code}"
-    assert response.json() == {"status": "ok"}, f"expected {{'status': 'ok'}}, got {response.json()}"
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok"}

@@ -73,9 +73,7 @@ def test_should_write_audio_file_to_disk(
     result = handle_video_uploaded(event=event, base_output_dir=base_output_dir)
 
     audio_path = Path(result.audio_path)
-    assert audio_path.is_file(), f"expected audio file at {audio_path}, but it does not exist"
+    assert audio_path.is_file()
 
     written_bytes = audio_path.read_bytes()
-    assert written_bytes == video_bytes, (
-        f"expected audio bytes {video_bytes!r}, got {written_bytes!r}"
-    )
+    assert written_bytes == video_bytes

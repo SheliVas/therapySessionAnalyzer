@@ -69,11 +69,9 @@ def test_should_call_backend_once_with_correct_audio_path_when_event_received(
     """Backend should be called exactly once with the audio path from the event."""
     generate_transcript(event, fake_backend, base_output_dir)
 
-    assert len(fake_backend.calls) == 1, f"expected 1 call, got {len(fake_backend.calls)}"
+    assert len(fake_backend.calls) == 1
     expected_path = Path(event.audio_path)
-    assert fake_backend.calls[0] == expected_path, (
-        f"expected audio_path {expected_path}, got {fake_backend.calls[0]}"
-    )
+    assert fake_backend.calls[0] == expected_path
 
 
 @pytest.mark.unit
@@ -85,9 +83,7 @@ def test_should_return_transcript_created_event_with_correct_video_id(
     """Returned event should have the same video_id as the input event."""
     result = generate_transcript(event, fake_backend, base_output_dir)
 
-    assert result.video_id == event.video_id, (
-        f"expected video_id {event.video_id}, got {result.video_id}"
-    )
+    assert result.video_id == event.video_id
 
 
 @pytest.mark.unit
@@ -100,9 +96,7 @@ def test_should_return_transcript_path_pointing_to_existing_file(
     result = generate_transcript(event, fake_backend, base_output_dir)
 
     transcript_file = Path(result.transcript_path)
-    assert transcript_file.exists(), (
-        f"expected transcript file to exist at {result.transcript_path}, but it does not"
-    )
+    assert transcript_file.exists()
 
 
 @pytest.mark.unit
@@ -115,12 +109,8 @@ def test_should_create_transcript_file_in_correct_location(
     result = generate_transcript(event, fake_backend, base_output_dir)
 
     expected_path = base_output_dir / event.video_id / "transcript.txt"
-    assert Path(result.transcript_path) == expected_path, (
-        f"expected transcript_path {expected_path}, got {result.transcript_path}"
-    )
-    assert expected_path.exists(), (
-        f"expected transcript file to exist at {expected_path}, but it does not"
-    )
+    assert Path(result.transcript_path) == expected_path
+    assert expected_path.exists()
 
 
 @pytest.mark.unit
@@ -135,6 +125,4 @@ def test_should_write_correct_transcript_content_to_file(
     transcript_file = Path(result.transcript_path)
     actual_content = transcript_file.read_text()
     expected_content = fake_backend.transcript_text
-    assert actual_content == expected_content, (
-        f"expected file content '{expected_content}', got '{actual_content}'"
-    )
+    assert actual_content == expected_content

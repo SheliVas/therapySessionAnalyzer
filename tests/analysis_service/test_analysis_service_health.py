@@ -15,7 +15,7 @@ def test_should_return_200_status_code_when_health_endpoint_called(client: TestC
 
     expected_status = 200
     actual_status = response.status_code
-    assert actual_status == expected_status, f"expected {expected_status}, got {actual_status}"
+    assert actual_status == expected_status
 
 
 @pytest.mark.unit
@@ -24,7 +24,7 @@ def test_should_return_ok_json_when_health_endpoint_called(client: TestClient):
 
     expected_json = {"status": "ok"}
     actual_json = response.json()
-    assert actual_json == expected_json, f"expected {expected_json}, got {actual_json}"
+    assert actual_json == expected_json
 
 
 @pytest.mark.unit
@@ -33,4 +33,4 @@ def test_should_create_app_instance_with_create_app_function():
 
     app_instance = create_app()
 
-    assert isinstance(app_instance, FastAPI), f"expected FastAPI instance, got {type(app_instance)}"
+    assert isinstance(app_instance, FastAPI)

@@ -17,11 +17,11 @@ def test_should_call_backend_analyze_once(
 
     expected_calls = 1
     actual_calls = len(fake_backend.calls)
-    assert actual_calls == expected_calls, f"expected {expected_calls} call, got {actual_calls}"
+    assert actual_calls == expected_calls
 
     expected_text = "hello world hello"
     actual_text = fake_backend.calls[0]
-    assert actual_text == expected_text, f"expected transcript text '{expected_text}', got '{actual_text}'"
+    assert actual_text == expected_text
 
 
 def test_should_return_analysis_completed_event_with_video_id_matching_event(
@@ -34,7 +34,7 @@ def test_should_return_analysis_completed_event_with_video_id_matching_event(
 
     expected_video_id = event.video_id
     actual_video_id = result.video_id
-    assert actual_video_id == expected_video_id, f"expected video_id '{expected_video_id}', got '{actual_video_id}'"
+    assert actual_video_id == expected_video_id
 
 
 def test_should_return_analysis_completed_event_with_correct_word_count(
@@ -47,7 +47,7 @@ def test_should_return_analysis_completed_event_with_correct_word_count(
 
     expected_word_count = 3
     actual_word_count = result.word_count
-    assert actual_word_count == expected_word_count, f"expected word_count {expected_word_count}, got {actual_word_count}"
+    assert actual_word_count == expected_word_count
 
 
 def test_should_return_analysis_completed_event_with_correct_extra_data(
@@ -60,7 +60,7 @@ def test_should_return_analysis_completed_event_with_correct_extra_data(
 
     expected_extra = {"backend": "fake"}
     actual_extra = result.extra
-    assert actual_extra == expected_extra, f"expected extra {expected_extra}, got {actual_extra}"
+    assert actual_extra == expected_extra
 
 
 def test_should_publish_exactly_one_event_equal_to_returned_event(
@@ -73,11 +73,11 @@ def test_should_publish_exactly_one_event_equal_to_returned_event(
 
     expected_count = 1
     actual_count = len(fake_publisher.published_events)
-    assert actual_count == expected_count, f"expected {expected_count} published event, got {actual_count}"
+    assert actual_count == expected_count
 
     expected_event = result
     actual_event = fake_publisher.published_events[0]
-    assert actual_event == expected_event, f"expected published event {expected_event}, got {actual_event}"
+    assert actual_event == expected_event
 
 
 def test_should_save_exactly_one_event_equal_to_returned_event(
@@ -90,8 +90,8 @@ def test_should_save_exactly_one_event_equal_to_returned_event(
 
     expected_count = 1
     actual_count = len(fake_repository.saved_events)
-    assert actual_count == expected_count, f"expected {expected_count} saved event, got {actual_count}"
+    assert actual_count == expected_count
 
     expected_event = result
     actual_event = fake_repository.saved_events[0]
-    assert actual_event == expected_event, f"expected saved event {expected_event}, got {actual_event}"
+    assert actual_event == expected_event
