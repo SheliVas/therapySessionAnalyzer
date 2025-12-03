@@ -1,5 +1,4 @@
 import json
-from unittest.mock import MagicMock
 
 import pika
 import pytest
@@ -9,6 +8,9 @@ from src.transcription_service.rabbitmq_publisher import (
     RabbitMQConfig,
     RabbitMQTranscriptEventPublisher,
 )
+
+
+# --- Fixtures ---
 
 
 @pytest.fixture
@@ -30,40 +32,23 @@ def event() -> TranscriptCreatedEvent:
     )
 
 
-@pytest.fixture
-def fake_channel() -> MagicMock:
-    return MagicMock()
+# --- Unit Tests ---
 
 
-@pytest.fixture
-def fake_connection(fake_channel: MagicMock) -> MagicMock:
-    conn = MagicMock()
-    conn.channel.return_value = fake_channel
-    return conn
-
-
-@pytest.fixture
-def mock_pika(monkeypatch, fake_connection: MagicMock) -> list[pika.ConnectionParameters]:
-    captured_params: list[pika.ConnectionParameters] = []
-
-    def fake_blocking_connection(params: pika.ConnectionParameters):
-        captured_params.append(params)
-        return fake_connection
-
-    monkeypatch.setattr(pika, "BlockingConnection", fake_blocking_connection)
-    return captured_params
-
-
+@pytest.mark.unit
 def test_should_connect_with_correct_parameters(
     config: RabbitMQConfig,
     event: TranscriptCreatedEvent,
-    mock_pika: list[pika.ConnectionParameters],
+    mocker,
+    mock_connection,
 ) -> None:
+    mock_pika = mocker.patch("pika.BlockingConnection", return_value=mock_connection)
+
     publisher = RabbitMQTranscriptEventPublisher(config)
     publisher.publish_transcript_created(event)
 
-    assert len(mock_pika) == 1, f"expected 1 connection attempt, got {len(mock_pika)}"
-    params = mock_pika[0]
+    mock_pika.assert_called_once()
+    params = mock_pika.call_args[0][0]
     assert isinstance(params, pika.ConnectionParameters), (
         f"expected pika.ConnectionParameters, got {type(params)}"
     )
@@ -77,32 +62,40 @@ def test_should_connect_with_correct_parameters(
     )
 
 
+@pytest.mark.unit
 def test_should_declare_queue_with_correct_name_and_durable(
     config: RabbitMQConfig,
     event: TranscriptCreatedEvent,
-    mock_pika: list[pika.ConnectionParameters],
-    fake_channel: MagicMock,
+    mocker,
+    mock_connection,
+    mock_channel,
 ) -> None:
+    mocker.patch("pika.BlockingConnection", return_value=mock_connection)
+
     publisher = RabbitMQTranscriptEventPublisher(config)
     publisher.publish_transcript_created(event)
 
-    fake_channel.queue_declare.assert_called_once_with(
+    mock_channel.queue_declare.assert_called_once_with(
         queue=config.queue_name,
         durable=True,
     )
 
 
+@pytest.mark.unit
 def test_should_publish_event_as_json_to_correct_queue(
     config: RabbitMQConfig,
     event: TranscriptCreatedEvent,
-    mock_pika: list[pika.ConnectionParameters],
-    fake_channel: MagicMock,
+    mocker,
+    mock_connection,
+    mock_channel,
 ) -> None:
+    mocker.patch("pika.BlockingConnection", return_value=mock_connection)
+
     publisher = RabbitMQTranscriptEventPublisher(config)
     publisher.publish_transcript_created(event)
 
-    fake_channel.basic_publish.assert_called_once()
-    call_kwargs = fake_channel.basic_publish.call_args.kwargs
+    mock_channel.basic_publish.assert_called_once()
+    call_kwargs = mock_channel.basic_publish.call_args.kwargs
 
     assert call_kwargs.get("exchange") == "", (
         f"expected exchange to be '', got {call_kwargs.get('exchange')}"
@@ -120,13 +113,16 @@ def test_should_publish_event_as_json_to_correct_queue(
     )
 
 
+@pytest.mark.unit
 def test_should_close_connection_after_publishing(
     config: RabbitMQConfig,
     event: TranscriptCreatedEvent,
-    mock_pika: list[pika.ConnectionParameters],
-    fake_connection: MagicMock,
+    mocker,
+    mock_connection,
 ) -> None:
+    mocker.patch("pika.BlockingConnection", return_value=mock_connection)
+
     publisher = RabbitMQTranscriptEventPublisher(config)
     publisher.publish_transcript_created(event)
 
-    fake_connection.close.assert_called_once()
+    mock_connection.close.assert_called_once()

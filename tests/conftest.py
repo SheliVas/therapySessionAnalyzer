@@ -1,6 +1,5 @@
 import pytest
 import mongomock
-from unittest.mock import MagicMock
 
 @pytest.fixture
 def mongo_client():
@@ -9,20 +8,19 @@ def mongo_client():
 
 
 @pytest.fixture
-def mock_channel():
-    channel = MagicMock()
-    return channel
+def mock_channel(mocker):
+    return mocker.MagicMock()
 
 
 @pytest.fixture
-def mock_connection(mock_channel):
-    connection = MagicMock()
+def mock_connection(mocker, mock_channel):
+    connection = mocker.MagicMock()
     connection.channel.return_value = mock_channel
     return connection
 
 
 @pytest.fixture
-def mock_pika(mock_connection):
-    pika_mock = MagicMock()
+def mock_pika(mocker, mock_connection):
+    pika_mock = mocker.MagicMock()
     pika_mock.BlockingConnection.return_value = mock_connection
     return pika_mock

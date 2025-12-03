@@ -1,5 +1,4 @@
 import json
-from unittest.mock import MagicMock
 
 import pika
 import pytest
@@ -9,6 +8,9 @@ from src.upload_service.rabbitmq_publisher import (
     RabbitMQConfig,
     RabbitMQVideoEventPublisher,
 )
+
+
+# --- Fixtures ---
 
 
 @pytest.fixture
@@ -31,90 +33,112 @@ def event() -> VideoUploadedEvent:
     )
 
 
-@pytest.fixture
-def fake_channel() -> MagicMock:
-    return MagicMock()
+# --- Unit Tests ---
 
 
-@pytest.fixture
-def fake_connection(fake_channel: MagicMock) -> MagicMock:
-    conn = MagicMock()
-    conn.channel.return_value = fake_channel
-    return conn
-
-
-@pytest.fixture
-def mock_pika(monkeypatch, fake_connection: MagicMock) -> list[pika.ConnectionParameters]:
-    captured_params: list[pika.ConnectionParameters] = []
-
-    def fake_blocking_connection(params: pika.ConnectionParameters):
-        captured_params.append(params)
-        return fake_connection
-
-    monkeypatch.setattr(pika, "BlockingConnection", fake_blocking_connection)
-    return captured_params
-
-
+@pytest.mark.unit
 def test_should_connect_with_correct_parameters(
     config: RabbitMQConfig,
     event: VideoUploadedEvent,
-    mock_pika: list[pika.ConnectionParameters],
+    mocker,
+    mock_connection,
 ):
+    mock_pika = mocker.patch("pika.BlockingConnection", return_value=mock_connection)
+
     publisher = RabbitMQVideoEventPublisher(config)
     publisher.publish_video_uploaded(event)
 
-    assert len(mock_pika) == 1, f"expected 1 connection attempt, got {len(mock_pika)}"
-    params = mock_pika[0]
-    assert isinstance(params, pika.ConnectionParameters), f"expected pika.ConnectionParameters, got {type(params)}"
-    assert params.host == config.host, f"expected host {config.host}, got {params.host}"
-    assert params.port == config.port, f"expected port {config.port}, got {params.port}"
-    assert params.credentials.username == config.username, f"expected username {config.username}, got {params.credentials.username}"
-    assert params.credentials.password == config.password, f"expected password {config.password}, got {params.credentials.password}"
+    mock_pika.assert_called_once()
+    params = mock_pika.call_args[0][0]
+    assert isinstance(params, pika.ConnectionParameters)
+    assert params.host == config.host
+    assert params.port == config.port
+    assert params.credentials.username == config.username
+    assert params.credentials.password == config.password
 
 
+@pytest.mark.unit
 def test_should_declare_queue_with_correct_name_and_durable(
     config: RabbitMQConfig,
     event: VideoUploadedEvent,
-    mock_pika: list,
-    fake_channel: MagicMock,
+    mocker,
+    mock_connection,
+    mock_channel,
 ):
+    mocker.patch("pika.BlockingConnection", return_value=mock_connection)
+
     publisher = RabbitMQVideoEventPublisher(config)
     publisher.publish_video_uploaded(event)
 
-    fake_channel.queue_declare.assert_called_once_with(
+    mock_channel.queue_declare.assert_called_once_with(
         queue=config.queue_name,
         durable=True,
-    ), f"expected queue_declare called with queue={config.queue_name} and durable=True"
+    )
 
 
+@pytest.mark.unit
 def test_should_publish_event_as_json_to_correct_queue(
     config: RabbitMQConfig,
     event: VideoUploadedEvent,
-    mock_pika: list,
-    fake_channel: MagicMock,
+    mocker,
+    mock_connection,
+    mock_channel,
 ):
+    mocker.patch("pika.BlockingConnection", return_value=mock_connection)
+
     publisher = RabbitMQVideoEventPublisher(config)
     publisher.publish_video_uploaded(event)
 
-    fake_channel.basic_publish.assert_called_once(), f"expected basic_publish to be called once, got {fake_channel.basic_publish.call_count}"
-    call_kwargs = fake_channel.basic_publish.call_args.kwargs
+    mock_channel.basic_publish.assert_called_once()
+    call_kwargs = mock_channel.basic_publish.call_args.kwargs
 
-    assert call_kwargs.get("exchange") == "", f"expected exchange to be '', got {call_kwargs.get('exchange')}"
-    assert call_kwargs.get("routing_key") == config.queue_name, f"expected routing_key to be {config.queue_name}, got {call_kwargs.get('routing_key')}"
+    assert call_kwargs.get("exchange") == ""
+    assert call_kwargs.get("routing_key") == config.queue_name
 
     body_dict = json.loads(call_kwargs.get("body"))
-    assert body_dict["video_id"] == event.video_id, f"expected video_id {event.video_id}, got {body_dict['video_id']}"
-    assert body_dict["filename"] == event.filename, f"expected filename {event.filename}, got {body_dict['filename']}"
-    assert body_dict["storage_path"] == event.storage_path, f"expected storage_path {event.storage_path}, got {body_dict['storage_path']}"
+    assert body_dict["video_id"] == event.video_id
+    assert body_dict["filename"] == event.filename
+    assert body_dict["storage_path"] == event.storage_path
 
 
+@pytest.mark.unit
 def test_should_close_connection_after_publishing(
     config: RabbitMQConfig,
     event: VideoUploadedEvent,
-    mock_pika: list,
-    fake_connection: MagicMock,
+    mocker,
+    mock_connection,
 ):
+    mocker.patch("pika.BlockingConnection", return_value=mock_connection)
+
     publisher = RabbitMQVideoEventPublisher(config)
     publisher.publish_video_uploaded(event)
 
-    fake_connection.close.assert_called_once(), f"expected close to be called once, got {fake_connection.close.call_count}"
+    mock_connection.close.assert_called_once()
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("video_id,filename,storage_path", [
+    ("", "test.mp4", "path/test.mp4"),
+    ("vid-1", "", "path/test.mp4"),
+    ("vid-1", "test.mp4", ""),
+])
+def test_should_publish_event_with_empty_fields(
+    config: RabbitMQConfig,
+    mocker,
+    mock_connection,
+    mock_channel,
+    video_id: str,
+    filename: str,
+    storage_path: str,
+):
+    mocker.patch("pika.BlockingConnection", return_value=mock_connection)
+    event = VideoUploadedEvent(
+        video_id=video_id,
+        filename=filename,
+        storage_path=storage_path,
+    )
+
+    publisher = RabbitMQVideoEventPublisher(config)
+    publisher.publish_video_uploaded(event)
+
+    mock_channel.basic_publish.assert_called_once()

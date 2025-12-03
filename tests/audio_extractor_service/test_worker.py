@@ -20,16 +20,16 @@ def test_should_return_audio_extracted_event_and_write_audio_file(
         publisher=fake_publisher,
     )
 
-    assert isinstance(result, AudioExtractedEvent), f"expected AudioExtractedEvent, got {type(result)}"
-    assert result.video_id == video_id, f"expected video_id {video_id}, got {result.video_id}"
+    assert isinstance(result, AudioExtractedEvent)
+    assert result.video_id == video_id
 
     audio_path = Path(result.audio_path)
     expected_audio_path = base_output_dir / video_id / "audio.mp3"
-    assert audio_path == expected_audio_path, f"expected audio_path {expected_audio_path}, got {audio_path}"
-    assert audio_path.is_file(), f"expected audio file at {audio_path}, but it does not exist"
+    assert audio_path == expected_audio_path
+    assert audio_path.is_file()
 
     written_bytes = audio_path.read_bytes()
-    assert written_bytes == video_bytes, "expected audio file content to match video content"
+    assert written_bytes == video_bytes
 
 
 def test_should_publish_audio_extracted_event_via_publisher(
@@ -43,8 +43,8 @@ def test_should_publish_audio_extracted_event_via_publisher(
         publisher=fake_publisher,
     )
 
-    assert len(fake_publisher.published_events) == 1, "expected one published event"
+    assert len(fake_publisher.published_events) == 1
 
     published_event = fake_publisher.published_events[0]
-    assert published_event.video_id == result.video_id, f"expected video_id {result.video_id}, got {published_event.video_id}"
-    assert published_event.audio_path == result.audio_path, f"expected audio_path {result.audio_path}, got {published_event.audio_path}"
+    assert published_event.video_id == result.video_id
+    assert published_event.audio_path == result.audio_path

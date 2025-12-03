@@ -23,6 +23,9 @@ class FakeTranscriptionBackend(TranscriptionBackend):
         return self.transcript_text
 
 
+# --- Fixtures ---
+
+
 @pytest.fixture
 def fake_audio_path(tmp_path: Path) -> Path:
     """Create a fake audio file and return its path."""
@@ -54,6 +57,10 @@ def base_output_dir(tmp_path: Path) -> Path:
     return tmp_path / "data" / "transcripts"
 
 
+# --- Unit Tests ---
+
+
+@pytest.mark.unit
 def test_should_call_backend_once_with_correct_audio_path_when_event_received(
     event: AudioExtractedEvent,
     fake_backend: FakeTranscriptionBackend,
@@ -69,6 +76,7 @@ def test_should_call_backend_once_with_correct_audio_path_when_event_received(
     )
 
 
+@pytest.mark.unit
 def test_should_return_transcript_created_event_with_correct_video_id(
     event: AudioExtractedEvent,
     fake_backend: FakeTranscriptionBackend,
@@ -82,6 +90,7 @@ def test_should_return_transcript_created_event_with_correct_video_id(
     )
 
 
+@pytest.mark.unit
 def test_should_return_transcript_path_pointing_to_existing_file(
     event: AudioExtractedEvent,
     fake_backend: FakeTranscriptionBackend,
@@ -96,6 +105,7 @@ def test_should_return_transcript_path_pointing_to_existing_file(
     )
 
 
+@pytest.mark.unit
 def test_should_create_transcript_file_in_correct_location(
     event: AudioExtractedEvent,
     fake_backend: FakeTranscriptionBackend,
@@ -113,6 +123,7 @@ def test_should_create_transcript_file_in_correct_location(
     )
 
 
+@pytest.mark.unit
 def test_should_write_correct_transcript_content_to_file(
     event: AudioExtractedEvent,
     fake_backend: FakeTranscriptionBackend,

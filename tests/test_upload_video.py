@@ -51,8 +51,10 @@ def files(some_filename: str, some_file_content: bytes, some_file_mimetype: str)
     }
 
 
-# --- Tests ---
+# --- Unit Tests ---
 
+
+@pytest.mark.unit
 def test_should_return_201_and_video_info_when_file_uploaded(
     client: TestClient,
     files: dict,
@@ -60,27 +62,29 @@ def test_should_return_201_and_video_info_when_file_uploaded(
 ):
     response = client.post("/videos", files=files)
 
-    assert response.status_code == 201, f"expected 201, got {response.status_code}"
+    assert response.status_code == 201
 
     body = response.json()
     assert isinstance(body, dict)
 
-    assert "video_id" in body, f"response body missing 'video_id': {body}"
-    assert isinstance(body["video_id"], str), f"'video_id' is not a string: {body['video_id']}"
-    assert body["video_id"] != "", "'video_id' is an empty string"
+    assert "video_id" in body
+    assert isinstance(body["video_id"], str)
+    assert body["video_id"] != ""
 
     UUID(body["video_id"])
 
-    assert "filename" in body, f"response body missing 'filename': {body}"
-    assert body["filename"] == some_filename, f"expected filename '{some_filename}', got '{body['filename']}'"
+    assert "filename" in body
+    assert body["filename"] == some_filename
 
 
+@pytest.mark.unit
 def test_should_return_422_when_file_field_missing(client: TestClient):
     response = client.post("/videos", files={})
 
-    assert response.status_code == 422, f"expected 422, got {response.status_code}"
+    assert response.status_code == 422
 
 
+@pytest.mark.integration
 def test_should_save_uploaded_file_to_disk_when_video_uploaded(
     tmp_path: Path,
     monkeypatch,
@@ -95,20 +99,21 @@ def test_should_save_uploaded_file_to_disk_when_video_uploaded(
 
     response = client.post("/videos", files=files)
 
-    assert response.status_code == 201, f"expected 201, got {response.status_code}"
+    assert response.status_code == 201
     body = response.json()
-    assert "video_id" in body, f"response body missing 'video_id': {body}"
+    assert "video_id" in body
     video_id = body["video_id"]
     UUID(video_id)
     assert body["filename"] == some_filename
 
     expected_path = tmp_path / "data" / "uploads" / video_id / some_filename
-    assert expected_path.is_file(), f"expected file at {expected_path}, but it does not exist"
+    assert expected_path.is_file()
 
     contents = expected_path.read_bytes()
-    assert contents == some_file_content, f"expected file contents {some_file_content}, got {contents}"
+    assert contents == some_file_content
 
 
+@pytest.mark.integration
 def test_should_publish_video_uploaded_event_when_video_uploaded(
     tmp_path: Path,
     monkeypatch,
@@ -122,17 +127,54 @@ def test_should_publish_video_uploaded_event_when_video_uploaded(
 
     response = client.post("/videos", files=files)
 
-    assert response.status_code == 201, f"expected 201, got {response.status_code}"
+    assert response.status_code == 201
     body = response.json()
     video_id = body["video_id"]
     UUID(video_id)
-    assert body["filename"] == some_filename, f"expected filename '{some_filename}', got '{body['filename']}'"
+    assert body["filename"] == some_filename
 
-    assert len(fake_publisher.published) == 1, f"expected 1 event, got {len(fake_publisher.published)}"
+    assert len(fake_publisher.published) == 1
 
     event = fake_publisher.published[0]
-    assert event.video_id == video_id, f"expected video_id '{video_id}', got '{event.video_id}'"
-    assert event.filename == some_filename, f"expected filename '{some_filename}', got '{event.filename}'"
+    assert event.video_id == video_id
+    assert event.filename == some_filename
 
     expected_path = Path("data") / "uploads" / video_id / some_filename
-    assert Path(event.storage_path) == expected_path, f"expected storage_path '{expected_path}', got '{event.storage_path}'"
+    assert Path(event.storage_path) == expected_path
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("invalid_files,description", [
+    ({}, "missing file field"),
+    ({"wrong_field": ("test.mp4", b"content", "video/mp4")}, "wrong field name"),
+])
+def test_should_return_422_for_invalid_file_uploads(
+    client: TestClient,
+    invalid_files: dict,
+    description: str,
+):
+    response = client.post("/videos", files=invalid_files)
+
+    assert response.status_code == 422
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("filename,mimetype", [
+    ("test.mp4", "video/mp4"),
+    ("session.mov", "video/quicktime"),
+    ("recording.avi", "video/x-msvideo"),
+    ("clip.webm", "video/webm"),
+])
+def test_should_accept_various_video_formats(
+    client: TestClient,
+    some_file_content: bytes,
+    filename: str,
+    mimetype: str,
+):
+    files = {"file": (filename, some_file_content, mimetype)}
+    
+    response = client.post("/videos", files=files)
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["filename"] == filename

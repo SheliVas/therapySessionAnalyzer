@@ -9,6 +9,7 @@ def client() -> TestClient:
     return TestClient(app)
 
 
+@pytest.mark.unit
 def test_should_return_200_status_code_when_health_endpoint_called(client: TestClient):
     response = client.get("/health")
 
@@ -17,6 +18,7 @@ def test_should_return_200_status_code_when_health_endpoint_called(client: TestC
     assert actual_status == expected_status, f"expected {expected_status}, got {actual_status}"
 
 
+@pytest.mark.unit
 def test_should_return_ok_json_when_health_endpoint_called(client: TestClient):
     response = client.get("/health")
 
@@ -25,6 +27,7 @@ def test_should_return_ok_json_when_health_endpoint_called(client: TestClient):
     assert actual_json == expected_json, f"expected {expected_json}, got {actual_json}"
 
 
+@pytest.mark.unit
 def test_should_create_app_instance_with_create_app_function():
     from fastapi import FastAPI
 

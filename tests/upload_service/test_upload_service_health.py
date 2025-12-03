@@ -1,6 +1,9 @@
+import pytest
 from fastapi.testclient import TestClient
 from src.upload_service.app import create_app
 
+
+@pytest.mark.unit
 def test_health_endpoint_returns_ok(fake_publisher):
     app = create_app(fake_publisher)
     client = TestClient(app)

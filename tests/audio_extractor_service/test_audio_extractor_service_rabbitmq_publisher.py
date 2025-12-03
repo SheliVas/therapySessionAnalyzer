@@ -1,7 +1,5 @@
 
 import json
-from unittest.mock import MagicMock
-
 import pika
 import pytest
 
@@ -31,63 +29,41 @@ def event() -> AudioExtractedEvent:
     )
 
 
-@pytest.fixture
-def fake_channel() -> MagicMock:
-    return MagicMock()
-
-
-@pytest.fixture
-def fake_connection(fake_channel: MagicMock) -> MagicMock:
-    conn = MagicMock()
-    conn.channel.return_value = fake_channel
-    return conn
-
-
-@pytest.fixture
-def mock_pika(monkeypatch, fake_connection: MagicMock) -> list[pika.ConnectionParameters]:
-    captured_params: list[pika.ConnectionParameters] = []
-
-    def fake_blocking_connection(params: pika.ConnectionParameters):
-        captured_params.append(params)
-        return fake_connection
-
-    monkeypatch.setattr(pika, "BlockingConnection", fake_blocking_connection)
-    return captured_params
-
-
 def test_should_connect_with_correct_parameters(
     config: RabbitMQConfig,
     event: AudioExtractedEvent,
-    mock_pika: list[pika.ConnectionParameters],
+    mocker,
+    mock_connection,
 ) -> None:
+    mock_blocking_connection = mocker.patch("pika.BlockingConnection", return_value=mock_connection)
+
     publisher = RabbitMQAudioEventPublisher(config)
     publisher.publish_audio_extracted(event)
 
-    assert len(mock_pika) == 1, f"expected 1 connection attempt, got {len(mock_pika)}"
-    params = mock_pika[0]
-    assert isinstance(params, pika.ConnectionParameters), (
-        f"expected pika.ConnectionParameters, got {type(params)}"
-    )
-    assert params.host == config.host, f"expected host {config.host}, got {params.host}"
-    assert params.port == config.port, f"expected port {config.port}, got {params.port}"
-    assert params.credentials.username == config.username, (
-        f"expected username {config.username}, got {params.credentials.username}"
-    )
-    assert params.credentials.password == config.password, (
-        f"expected password {config.password}, got {params.credentials.password}"
-    )
+    mock_blocking_connection.assert_called_once()
+    call_args = mock_blocking_connection.call_args
+    params = call_args[0][0]
+
+    assert isinstance(params, pika.ConnectionParameters)
+    assert params.host == config.host
+    assert params.port == config.port
+    assert params.credentials.username == config.username
+    assert params.credentials.password == config.password
 
 
 def test_should_declare_queue_with_correct_name_and_durable(
     config: RabbitMQConfig,
     event: AudioExtractedEvent,
-    mock_pika: list[pika.ConnectionParameters],
-    fake_channel: MagicMock,
+    mocker,
+    mock_connection,
+    mock_channel,
 ) -> None:
+    mocker.patch("pika.BlockingConnection", return_value=mock_connection)
+
     publisher = RabbitMQAudioEventPublisher(config)
     publisher.publish_audio_extracted(event)
 
-    fake_channel.queue_declare.assert_called_once_with(
+    mock_channel.queue_declare.assert_called_once_with(
         queue=config.queue_name,
         durable=True,
     )
@@ -96,38 +72,35 @@ def test_should_declare_queue_with_correct_name_and_durable(
 def test_should_publish_event_as_json_to_correct_queue(
     config: RabbitMQConfig,
     event: AudioExtractedEvent,
-    mock_pika: list[pika.ConnectionParameters],
-    fake_channel: MagicMock,
+    mocker,
+    mock_connection,
+    mock_channel,
 ) -> None:
+    mocker.patch("pika.BlockingConnection", return_value=mock_connection)
+
     publisher = RabbitMQAudioEventPublisher(config)
     publisher.publish_audio_extracted(event)
 
-    fake_channel.basic_publish.assert_called_once()
-    call_kwargs = fake_channel.basic_publish.call_args.kwargs
+    mock_channel.basic_publish.assert_called_once()
+    call_kwargs = mock_channel.basic_publish.call_args.kwargs
 
-    assert call_kwargs.get("exchange") == "", (
-        f"expected exchange to be '', got {call_kwargs.get('exchange')}"
-    )
-    assert call_kwargs.get("routing_key") == config.queue_name, (
-        f"expected routing_key to be {config.queue_name}, got {call_kwargs.get('routing_key')}"
-    )
+    assert call_kwargs.get("exchange") == ""
+    assert call_kwargs.get("routing_key") == config.queue_name
 
     body_dict = json.loads(call_kwargs.get("body"))
-    assert body_dict["video_id"] == event.video_id, (
-        f"expected video_id {event.video_id}, got {body_dict['video_id']}"
-    )
-    assert body_dict["audio_path"] == event.audio_path, (
-        f"expected audio_path {event.audio_path}, got {body_dict['audio_path']}"
-    )
+    assert body_dict["video_id"] == event.video_id
+    assert body_dict["audio_path"] == event.audio_path
 
 
 def test_should_close_connection_after_publishing(
     config: RabbitMQConfig,
     event: AudioExtractedEvent,
-    mock_pika: list[pika.ConnectionParameters],
-    fake_connection: MagicMock,
+    mocker,
+    mock_connection,
 ) -> None:
+    mocker.patch("pika.BlockingConnection", return_value=mock_connection)
+
     publisher = RabbitMQAudioEventPublisher(config)
     publisher.publish_audio_extracted(event)
 
-    fake_connection.close.assert_called_once()
+    mock_connection.close.assert_called_once()

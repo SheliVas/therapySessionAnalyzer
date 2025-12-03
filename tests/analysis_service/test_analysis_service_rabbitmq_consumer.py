@@ -1,21 +1,15 @@
 import json
 from pathlib import Path
-from unittest.mock import MagicMock
+from typing import Callable, Any
 
 import pytest
 import pika
 
-from src.transcription_service.domain import TranscriptCreatedEvent
-from src.analysis_service.domain import AnalysisBackend, AnalysisResult
-from src.analysis_service.worker import (
-    AnalysisCompletedEvent,
-    AnalysisEventPublisher,
-    AnalysisRepository,
-)
 from src.analysis_service.rabbitmq_consumer import (
     RabbitMQConsumerConfig,
     RabbitMQTranscriptCreatedConsumer,
 )
+from tests.analysis_service.conftest import FakeAnalysisBackend, FakeAnalysisEventPublisher, FakeAnalysisRepository
 
 
 # --- Fixtures ---
@@ -30,11 +24,6 @@ def config() -> RabbitMQConsumerConfig:
         password="guest",
         queue_name="transcript.created",
     )
-
-
-@pytest.fixture
-def video_id() -> str:
-    return "video-123"
 
 
 @pytest.fixture
@@ -57,55 +46,9 @@ def message_body(video_id: str, transcript_path: str) -> bytes:
     }).encode("utf-8")
 
 
-class FakeAnalysisBackend(AnalysisBackend):
-    def __init__(self, video_id: str) -> None:
-        self.video_id = video_id
-        self.calls: list[str] = []
-
-    def analyze(self, transcript_text: str) -> AnalysisResult:
-        self.calls.append(transcript_text)
-        word_count = len(transcript_text.split())
-        return AnalysisResult(
-            video_id=self.video_id,
-            word_count=word_count,
-            extra={"backend": "fake"},
-        )
-
-
-class FakeAnalysisEventPublisher(AnalysisEventPublisher):
-    def __init__(self) -> None:
-        self.published_events: list[AnalysisCompletedEvent] = []
-
-    def publish_analysis_completed(self, event: AnalysisCompletedEvent) -> None:
-        self.published_events.append(event)
-
-
-class FakeAnalysisRepository(AnalysisRepository):
-    def __init__(self) -> None:
-        self.saved_events: list[AnalysisCompletedEvent] = []
-
-    def save_analysis(self, event: AnalysisCompletedEvent) -> None:
-        self.saved_events.append(event)
-
-
 @pytest.fixture
-def fake_backend(video_id: str) -> FakeAnalysisBackend:
-    return FakeAnalysisBackend(video_id=video_id)
-
-
-@pytest.fixture
-def fake_publisher() -> FakeAnalysisEventPublisher:
-    return FakeAnalysisEventPublisher()
-
-
-@pytest.fixture
-def fake_repository() -> FakeAnalysisRepository:
-    return FakeAnalysisRepository()
-
-
-@pytest.fixture
-def fake_channel() -> MagicMock:
-    channel = MagicMock()
+def mock_channel(mocker):
+    channel = mocker.MagicMock()
     channel._consume_callback = None
 
     def capture_basic_consume(queue, on_message_callback, auto_ack=False):
@@ -117,34 +60,55 @@ def fake_channel() -> MagicMock:
 
 
 @pytest.fixture
-def fake_connection(fake_channel: MagicMock) -> MagicMock:
-    connection = MagicMock()
-    connection.channel.return_value = fake_channel
+def mock_connection(mocker, mock_channel):
+    connection = mocker.MagicMock()
+    connection.channel.return_value = mock_channel
     return connection
 
 
 @pytest.fixture
-def mock_pika(monkeypatch, fake_connection: MagicMock) -> list[pika.ConnectionParameters]:
-    captured_params: list[pika.ConnectionParameters] = []
-
-    def fake_blocking_connection(params):
-        captured_params.append(params)
-        return fake_connection
-
-    monkeypatch.setattr(pika, "BlockingConnection", fake_blocking_connection)
-    return captured_params
+def mock_pika(mocker, mock_connection):
+    return mocker.patch("pika.BlockingConnection", return_value=mock_connection)
 
 
-# --- Tests ---
+@pytest.fixture
+def started_consumer(
+    config: RabbitMQConsumerConfig,
+    fake_backend: FakeAnalysisBackend,
+    fake_publisher: FakeAnalysisEventPublisher,
+    fake_repository: FakeAnalysisRepository,
+    mock_channel,
+    mock_pika,
+) -> tuple[RabbitMQTranscriptCreatedConsumer, Any, Callable]:
+    """Fixture that sets up and starts a consumer, returning the consumer, channel, and callback."""
+    mock_channel.start_consuming.side_effect = KeyboardInterrupt
+    
+    consumer = RabbitMQTranscriptCreatedConsumer(
+        config=config,
+        backend=fake_backend,
+        publisher=fake_publisher,
+        repository=fake_repository,
+    )
+    
+    try:
+        consumer.run_forever()
+    except KeyboardInterrupt:
+        pass
+    
+    return consumer, mock_channel, mock_channel._consume_callback
 
 
+# --- Unit Tests ---
+
+
+@pytest.mark.unit
 def test_should_connect_with_correct_parameters(
     config: RabbitMQConsumerConfig,
     fake_backend: FakeAnalysisBackend,
     fake_publisher: FakeAnalysisEventPublisher,
     fake_repository: FakeAnalysisRepository,
-    fake_channel: MagicMock,
-    mock_pika: list[pika.ConnectionParameters],
+    mock_channel,
+    mock_pika,
 ):
     consumer = RabbitMQTranscriptCreatedConsumer(
         config=config,
@@ -153,28 +117,29 @@ def test_should_connect_with_correct_parameters(
         repository=fake_repository,
     )
 
-    fake_channel.start_consuming.side_effect = KeyboardInterrupt
+    mock_channel.start_consuming.side_effect = KeyboardInterrupt
 
     try:
         consumer.run_forever()
     except KeyboardInterrupt:
         pass
 
-    assert len(mock_pika) == 1, f"expected 1 connection attempt, got {len(mock_pika)}"
-    params = mock_pika[0]
-    assert params.host == config.host, f"expected host {config.host}, got {params.host}"
-    assert params.port == config.port, f"expected port {config.port}, got {params.port}"
-    assert params.credentials.username == config.username, f"expected username {config.username}, got {params.credentials.username}"
-    assert params.credentials.password == config.password, f"expected password {config.password}, got {params.credentials.password}"
+    mock_pika.assert_called_once()
+    params = mock_pika.call_args[0][0]
+    assert params.host == config.host
+    assert params.port == config.port
+    assert params.credentials.username == config.username
+    assert params.credentials.password == config.password
 
 
+@pytest.mark.unit
 def test_should_declare_queue_durable(
     config: RabbitMQConsumerConfig,
     fake_backend: FakeAnalysisBackend,
     fake_publisher: FakeAnalysisEventPublisher,
     fake_repository: FakeAnalysisRepository,
-    fake_channel: MagicMock,
-    mock_pika: list[pika.ConnectionParameters],
+    mock_channel,
+    mock_pika,
 ):
     consumer = RabbitMQTranscriptCreatedConsumer(
         config=config,
@@ -183,159 +148,142 @@ def test_should_declare_queue_durable(
         repository=fake_repository,
     )
 
-    fake_channel.start_consuming.side_effect = KeyboardInterrupt
+    mock_channel.start_consuming.side_effect = KeyboardInterrupt
 
     try:
         consumer.run_forever()
     except KeyboardInterrupt:
         pass
 
-    fake_channel.queue_declare.assert_called_once_with(
+    mock_channel.queue_declare.assert_called_once_with(
         queue=config.queue_name,
         durable=True,
-    ), f"expected queue_declare called with queue={config.queue_name} and durable=True"
+    )
 
 
+@pytest.mark.unit
 def test_should_process_message_and_call_backend(
-    config: RabbitMQConsumerConfig,
+    started_consumer: tuple,
     fake_backend: FakeAnalysisBackend,
-    fake_publisher: FakeAnalysisEventPublisher,
-    fake_repository: FakeAnalysisRepository,
-    fake_channel: MagicMock,
-    mock_pika: list[pika.ConnectionParameters],
     message_body: bytes,
     transcript_text: str,
+    mocker,
 ):
-    consumer = RabbitMQTranscriptCreatedConsumer(
-        config=config,
-        backend=fake_backend,
-        publisher=fake_publisher,
-        repository=fake_repository,
-    )
+    consumer, mock_channel, callback = started_consumer
+    assert callback is not None
 
-    fake_channel.start_consuming.side_effect = KeyboardInterrupt
-
-    try:
-        consumer.run_forever()
-    except KeyboardInterrupt:
-        pass
-
-    callback = fake_channel._consume_callback
-    assert callback is not None, "basic_consume callback was not registered"
-
-    fake_method = MagicMock()
+    fake_method = mocker.MagicMock()
     fake_method.delivery_tag = 42
 
-    callback(fake_channel, fake_method, None, message_body)
+    callback(mock_channel, fake_method, None, message_body)
 
-    assert len(fake_backend.calls) == 1, f"expected backend to be called once, got {len(fake_backend.calls)}"
-    assert fake_backend.calls[0] == transcript_text, f"expected transcript text '{transcript_text}', got '{fake_backend.calls[0]}'"
+    assert len(fake_backend.calls) == 1
+    assert fake_backend.calls[0] == transcript_text
 
 
+@pytest.mark.unit
 def test_should_save_exactly_one_event_after_processing(
-    config: RabbitMQConsumerConfig,
-    fake_backend: FakeAnalysisBackend,
-    fake_publisher: FakeAnalysisEventPublisher,
+    started_consumer: tuple,
     fake_repository: FakeAnalysisRepository,
-    fake_channel: MagicMock,
-    mock_pika: list[pika.ConnectionParameters],
     message_body: bytes,
     video_id: str,
+    mocker,
 ):
-    consumer = RabbitMQTranscriptCreatedConsumer(
-        config=config,
-        backend=fake_backend,
-        publisher=fake_publisher,
-        repository=fake_repository,
-    )
+    consumer, mock_channel, callback = started_consumer
+    assert callback is not None
 
-    fake_channel.start_consuming.side_effect = KeyboardInterrupt
-
-    try:
-        consumer.run_forever()
-    except KeyboardInterrupt:
-        pass
-
-    callback = fake_channel._consume_callback
-    assert callback is not None, "basic_consume callback was not registered"
-
-    fake_method = MagicMock()
+    fake_method = mocker.MagicMock()
     fake_method.delivery_tag = 42
 
-    callback(fake_channel, fake_method, None, message_body)
+    callback(mock_channel, fake_method, None, message_body)
 
-    assert len(fake_repository.saved_events) == 1, f"expected one saved event, got {len(fake_repository.saved_events)}"
+    assert len(fake_repository.saved_events) == 1
     event = fake_repository.saved_events[0]
-    assert event.video_id == video_id, f"expected video_id {video_id}, got {event.video_id}"
-    assert event.word_count == 3, f"expected word_count 3, got {event.word_count}"
+    assert event.video_id == video_id
+    assert event.word_count == 3
 
 
+@pytest.mark.unit
 def test_should_publish_exactly_one_event_after_processing(
-    config: RabbitMQConsumerConfig,
-    fake_backend: FakeAnalysisBackend,
+    started_consumer: tuple,
     fake_publisher: FakeAnalysisEventPublisher,
-    fake_repository: FakeAnalysisRepository,
-    fake_channel: MagicMock,
-    mock_pika: list[pika.ConnectionParameters],
     message_body: bytes,
     video_id: str,
+    mocker,
 ):
-    consumer = RabbitMQTranscriptCreatedConsumer(
-        config=config,
-        backend=fake_backend,
-        publisher=fake_publisher,
-        repository=fake_repository,
-    )
 
-    fake_channel.start_consuming.side_effect = KeyboardInterrupt
+    consumer, mock_channel, callback = started_consumer
+    assert callback is not None
 
-    try:
-        consumer.run_forever()
-    except KeyboardInterrupt:
-        pass
-
-    callback = fake_channel._consume_callback
-    assert callback is not None, "basic_consume callback was not registered"
-
-    fake_method = MagicMock()
+    fake_method = mocker.MagicMock()
     fake_method.delivery_tag = 42
 
-    callback(fake_channel, fake_method, None, message_body)
+    callback(mock_channel, fake_method, None, message_body)
 
-    assert len(fake_publisher.published_events) == 1, f"expected one published event, got {len(fake_publisher.published_events)}"
+    assert len(fake_publisher.published_events) == 1
     event = fake_publisher.published_events[0]
-    assert event.video_id == video_id, f"expected video_id {video_id}, got {event.video_id}"
+    assert event.video_id == video_id
 
 
+@pytest.mark.unit
 def test_should_acknowledge_message_after_processing(
+    started_consumer: tuple,
+    message_body: bytes,
+    mocker,
+):
+    consumer, mock_channel, callback = started_consumer
+    assert callback is not None
+
+    fake_method = mocker.MagicMock()
+    fake_method.delivery_tag = 42
+
+    callback(mock_channel, fake_method, None, message_body)
+
+    mock_channel.basic_ack.assert_called_once_with(delivery_tag=42)
+
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("invalid_body,description", [
+    (b"not-json", "non-JSON body"),
+    (b'{"video_id": null}', "null video_id"),
+    (b'{}', "empty JSON object"),
+    (b'{"video_id": "v1"}', "missing transcript_path"),
+])
+def test_should_handle_malformed_message_gracefully(
     config: RabbitMQConsumerConfig,
     fake_backend: FakeAnalysisBackend,
     fake_publisher: FakeAnalysisEventPublisher,
     fake_repository: FakeAnalysisRepository,
-    fake_channel: MagicMock,
-    mock_pika: list[pika.ConnectionParameters],
-    message_body: bytes,
+    mock_channel,
+    mock_pika,
+    invalid_body: bytes,
+    description: str,
+    mocker,
 ):
+    mock_channel.start_consuming.side_effect = KeyboardInterrupt
+    
     consumer = RabbitMQTranscriptCreatedConsumer(
         config=config,
         backend=fake_backend,
         publisher=fake_publisher,
         repository=fake_repository,
     )
-
-    fake_channel.start_consuming.side_effect = KeyboardInterrupt
-
+    
     try:
         consumer.run_forever()
     except KeyboardInterrupt:
         pass
-
-    callback = fake_channel._consume_callback
-    assert callback is not None, "basic_consume callback was not registered"
-
-    fake_method = MagicMock()
+    
+    callback = mock_channel._consume_callback
+    assert callback is not None
+    
+    fake_method = mocker.MagicMock()
     fake_method.delivery_tag = 42
 
-    callback(fake_channel, fake_method, None, message_body)
-
-    fake_channel.basic_ack.assert_called_once_with(delivery_tag=42), "expected basic_ack to be called once with delivery_tag=42"
+    try:
+        callback(mock_channel, fake_method, None, invalid_body)
+    except Exception as e:
+        pass
+    
+    assert len(fake_publisher.published_events) == 0

@@ -7,3 +7,5 @@ pydantic
 pika
 pymongo
 mongomock
+pytest-mock
+

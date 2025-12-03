@@ -34,16 +34,10 @@ class TestMongoAnalysisRepository:
         repository.save_analysis(sample_event)
         result = repository.get_analysis("video-123")
 
-        assert result is not None, "expected event to be found, got None"
-        assert result.video_id == sample_event.video_id, (
-            f"expected video_id {sample_event.video_id}, got {result.video_id}"
-        )
-        assert result.word_count == sample_event.word_count, (
-            f"expected word_count {sample_event.word_count}, got {result.word_count}"
-        )
-        assert result.extra == {"foo": "bar"}, (
-            f"expected extra {{'foo': 'bar'}}, got {result.extra}"
-        )
+        assert result is not None
+        assert result.video_id == sample_event.video_id
+        assert result.word_count == sample_event.word_count
+        assert result.extra == {"foo": "bar"}
 
     def test_should_return_none_when_event_not_found(
         self,
@@ -51,7 +45,7 @@ class TestMongoAnalysisRepository:
     ) -> None:
         result = repository.get_analysis("missing-id")
 
-        assert result is None, f"expected None for missing video_id, got {result}"
+        assert result is None
 
     def test_should_upsert_event_when_saving_same_video_id_twice(
         self,
@@ -75,9 +69,7 @@ class TestMongoAnalysisRepository:
 
         collection = mongo_client["therapy_analysis"]["analysis_results"]
         doc_count = collection.count_documents({"video_id": "video-123"})
-        assert doc_count == 1, f"expected 1 document after upsert, got {doc_count}"
-        assert result is not None, "expected event to be found, got None"
-        assert result.word_count == 99, f"expected word_count 99, got {result.word_count}"
-        assert result.extra == {"version": 2}, (
-            f"expected extra {{'version': 2}}, got {result.extra}"
-        )
+        assert doc_count == 1
+        assert result is not None
+        assert result.word_count == 99
+        assert result.extra == {"version": 2}
