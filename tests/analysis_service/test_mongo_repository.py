@@ -6,11 +6,6 @@ from src.analysis_service.mongo_repository import MongoAnalysisRepository
 
 
 @pytest.fixture
-def mongo_client() -> mongomock.MongoClient:
-    return mongomock.MongoClient()
-
-
-@pytest.fixture
 def repository(mongo_client: mongomock.MongoClient) -> MongoAnalysisRepository:
     return MongoAnalysisRepository(client=mongo_client)
 
@@ -26,18 +21,31 @@ def sample_event() -> AnalysisCompletedEvent:
 
 class TestMongoAnalysisRepository:
 
-    def test_should_save_and_retrieve_event_when_event_exists(
+    @pytest.mark.parametrize("video_id, word_count, extra", [
+        ("video-123", 42, {"foo": "bar"}),
+        ("video-zero", 0, {}),
+        ("video-complex", 1000, {"nested": {"a": 1}, "list": [1, 2]}),
+    ])
+    def test_should_save_and_retrieve_event_with_various_data_shapes(
         self,
         repository: MongoAnalysisRepository,
-        sample_event: AnalysisCompletedEvent,
+        video_id: str,
+        word_count: int,
+        extra: dict,
     ) -> None:
-        repository.save_analysis(sample_event)
-        result = repository.get_analysis("video-123")
+        event = AnalysisCompletedEvent(
+            video_id=video_id,
+            word_count=word_count,
+            extra=extra,
+        )
+        
+        repository.save_analysis(event)
+        result = repository.get_analysis(video_id)
 
         assert result is not None
-        assert result.video_id == sample_event.video_id
-        assert result.word_count == sample_event.word_count
-        assert result.extra == {"foo": "bar"}
+        assert result.video_id == video_id
+        assert result.word_count == word_count
+        assert result.extra == extra
 
     def test_should_return_none_when_event_not_found(
         self,

@@ -33,22 +33,22 @@ def test_should_list_all_videos_when_collection_has_documents(repository_with_da
     assert all(isinstance(v, VideoSummary) for v in videos)
 
 
-def test_should_contain_video_summary_for_video_1(repository_with_data):
+@pytest.mark.parametrize("video_id, expected_word_count, expected_extra", [
+    ("video-1", 10, {"foo": "bar"}),
+    ("video-2", 20, {"foo": "baz"}),
+])
+def test_should_contain_correct_video_summaries(
+    repository_with_data, 
+    video_id, 
+    expected_word_count, 
+    expected_extra
+):
     videos = repository_with_data.list_videos()
-    video_1 = next((v for v in videos if v.video_id == "video-1"), None)
+    video = next((v for v in videos if v.video_id == video_id), None)
     
-    assert video_1 is not None
-    assert video_1.word_count == 10
-    assert video_1.extra == {"foo": "bar"}
-
-
-def test_should_contain_video_summary_for_video_2(repository_with_data):
-    videos = repository_with_data.list_videos()
-    video_2 = next((v for v in videos if v.video_id == "video-2"), None)
-    
-    assert video_2 is not None
-    assert video_2.word_count == 20
-    assert video_2.extra == {"foo": "baz"}
+    assert video is not None
+    assert video.word_count == expected_word_count
+    assert video.extra == expected_extra
 
 
 def test_should_return_empty_list_when_no_documents(mongo_client):

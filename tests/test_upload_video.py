@@ -6,6 +6,7 @@ import pytest
 
 from src.upload_service.app import create_app
 from src.upload_service.domain import VideoEventPublisher, VideoUploadedEvent
+from tests.conftest import FakeVideoEventPublisher
 
 
 # --- Fixtures ---
@@ -25,17 +26,10 @@ def some_file_mimetype() -> str:
     return "video/mp4"
 
 
-class FakeVideoEventPublisher(VideoEventPublisher):
-    def __init__(self) -> None:
-        self.published: list[VideoUploadedEvent] = []
-
-    def publish_video_uploaded(self, event: VideoUploadedEvent) -> None:
-        self.published.append(event)
-
-
 @pytest.fixture
-def fake_publisher() -> FakeVideoEventPublisher:
-    return FakeVideoEventPublisher()
+def fake_publisher(fake_video_publisher) -> FakeVideoEventPublisher:
+    """Alias the global fake_video_publisher fixture."""
+    return fake_video_publisher
 
 
 @pytest.fixture

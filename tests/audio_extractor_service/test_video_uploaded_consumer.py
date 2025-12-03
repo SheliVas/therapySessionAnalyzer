@@ -232,3 +232,54 @@ def test_should_acknowledge_message_after_processing(
     callback(mock_channel, fake_method, None, message_body)
 
     mock_channel.basic_ack.assert_called_once_with(delivery_tag=42)
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("invalid_body,description", [
+    (b"not-json", "non-JSON body"),
+    (b'{"video_id": null}', "null video_id"),
+    (b'{}', "empty JSON object"),
+    (b'{"video_id": "v1"}', "missing storage_path"),
+])
+def test_should_handle_malformed_message_gracefully(
+    config: RabbitMQConsumerConfig,
+    base_output_dir: Path,
+    fake_publisher: FakeAudioEventPublisher,
+    mocker,
+    mock_connection,
+    mock_channel,
+    invalid_body: bytes,
+    description: str,
+):
+    mocker.patch("pika.BlockingConnection", return_value=mock_connection)
+    mock_channel.start_consuming.side_effect = KeyboardInterrupt
+
+    captured_callback = {}
+    def capture_basic_consume(queue, on_message_callback, auto_ack=False):
+        captured_callback['callback'] = on_message_callback
+        return "consumer-tag"
+    mock_channel.basic_consume.side_effect = capture_basic_consume
+
+    consumer = RabbitMQVideoUploadedConsumer(
+        config=config,
+        base_output_dir=base_output_dir,
+        publisher=fake_publisher,
+    )
+
+    try:
+        consumer.run_forever()
+    except KeyboardInterrupt:
+        pass
+
+    callback = captured_callback.get('callback')
+    assert callback is not None
+
+    fake_method = mocker.MagicMock()
+    fake_method.delivery_tag = 42
+
+    try:
+        callback(mock_channel, fake_method, None, invalid_body)
+    except Exception:
+        pass
+
+    assert len(fake_publisher.published_events) == 0
