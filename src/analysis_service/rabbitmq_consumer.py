@@ -1,4 +1,5 @@
 import json
+import time
 
 import pika
 from pydantic import BaseModel
@@ -59,7 +60,13 @@ class RabbitMQTranscriptCreatedConsumer:
             credentials=credentials,
         )
 
-        connection = pika.BlockingConnection(parameters)
+        while True:
+            try:
+                connection = pika.BlockingConnection(parameters)
+                break
+            except pika.exceptions.AMQPConnectionError:
+                print("RabbitMQ not ready yet, retrying in 5 seconds...")
+                time.sleep(5)
         channel = connection.channel()
         channel.queue_declare(queue=self._config.queue_name, durable=True)
 
