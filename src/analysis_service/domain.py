@@ -33,4 +33,11 @@ def analyze_transcript(event: TranscriptCreatedEvent, backend: AnalysisBackend) 
     transcript_path = Path(event.transcript_path)
     transcript_text = transcript_path.read_text(encoding="utf-8")
     result = backend.analyze(transcript_text)
+
+    if result.video_id != event.video_id:
+        result = AnalysisResult(
+            video_id=event.video_id,
+            word_count=result.word_count,
+            extra=result.extra,
+        )
     return result
