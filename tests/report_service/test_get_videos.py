@@ -11,6 +11,9 @@ class FakeReportRepository(ReportRepository):
     def list_videos(self) -> list[VideoSummary]:
         return self.videos
 
+    def get_video(self, video_id: str) -> VideoSummary | None:
+        return next((v for v in self.videos if v.video_id == video_id), None)
+
 
 @pytest.fixture
 def sample_videos() -> list[VideoSummary]:
