@@ -1,7 +1,9 @@
 import pytest
 from pathlib import Path
+from typing import Dict, Any
 from src.transcription_service.domain import TranscriptCreatedEvent
 from src.analysis_service.domain import AnalysisBackend, AnalysisResult
+from src.analysis_service.llm_client import LLMClient
 from src.analysis_service.worker import (
     AnalysisCompletedEvent,
     AnalysisEventPublisher,
@@ -40,6 +42,16 @@ class FakeAnalysisRepository(AnalysisRepository):
         self.saved_events.append(event)
 
 
+class FakeLLMClient(LLMClient):
+    """Fake LLM client for testing."""
+    def __init__(self, return_value: Dict[str, Any]) -> None:
+        self.return_value = return_value
+
+    def analyze_transcript(self, transcript_text: str) -> Dict[str, Any]:
+        return self.return_value
+
+
+
 @pytest.fixture
 def fake_transcript_path(tmp_path: Path) -> str:
     transcript_file = tmp_path / "transcript.txt"
@@ -73,3 +85,13 @@ def fake_publisher() -> FakeAnalysisEventPublisher:
 @pytest.fixture
 def fake_repository() -> FakeAnalysisRepository:
     return FakeAnalysisRepository()
+
+
+@pytest.fixture
+def fake_llm_result() -> Dict[str, Any]:
+    return {"summary": "short summary", "topics": ["topic1", "topic2"]}
+
+
+@pytest.fixture
+def fake_llm_client(fake_llm_result: Dict[str, Any]) -> FakeLLMClient:
+    return FakeLLMClient(return_value=fake_llm_result)
