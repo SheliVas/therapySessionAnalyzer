@@ -1,12 +1,12 @@
-from fastapi import FastAPI, UploadFile, File, status
+from fastapi import FastAPI, UploadFile, File, status, HTTPException
 from pydantic import BaseModel
-import uuid
+from datetime import datetime
 from pathlib import Path
 
-from src.upload_service.domain import VideoEventPublisher, VideoUploadedEvent
+from src.upload_service.domain import VideoEventPublisher, handle_video_upload
 from src.upload_service.config import get_rabbitmq_config
+from src.upload_service.storage import StorageClient
 from src.upload_service.rabbitmq_publisher import RabbitMQVideoEventPublisher
-
 
 
 class VideoUploadResponse(BaseModel):
@@ -14,23 +14,19 @@ class VideoUploadResponse(BaseModel):
     filename: str
 
 
-class NoOpVideoEventPublisher:
-    def publish_video_uploaded(self, event: VideoUploadedEvent) -> None:
-        # Stub implementation: do nothing for now
-        pass
-
-
 def create_production_app() -> FastAPI:
     config = get_rabbitmq_config()
     publisher = RabbitMQVideoEventPublisher(config)
-    return create_app(publisher)
+    # TODO: Wire up MinioStorage once implemented
+    # storage_client = MinioStorage(get_minio_config())
+    return create_app(storage_client=publisher, publisher=publisher)
 
 
-def create_app(publisher: VideoEventPublisher | None = None) -> FastAPI:
+def create_app(
+    storage_client: StorageClient,
+    publisher: VideoEventPublisher,
+) -> FastAPI:
     app = FastAPI(title="Upload Service")
-
-    if publisher is None:
-        publisher = NoOpVideoEventPublisher()
 
     @app.get("/health")
     def health_check():
@@ -42,28 +38,21 @@ def create_app(publisher: VideoEventPublisher | None = None) -> FastAPI:
         response_model=VideoUploadResponse,
     )
     async def upload_video(file: UploadFile = File(...)) -> VideoUploadResponse:
-        video_id = str(uuid.uuid4())
-        base_dir = Path("data") / "uploads" / video_id
-        base_dir.mkdir(parents=True, exist_ok=True)
-
-        target_path = base_dir / file.filename
+        """Upload a video file and publish an event."""
         content = await file.read()
-        target_path.write_bytes(content)
         
-        event = VideoUploadedEvent(
-            video_id=video_id,
-            filename=file.filename,
-            storage_path=str(target_path),
-        )
-
-        publisher.publish_video_uploaded(event)
-
-        return VideoUploadResponse(
-            video_id=video_id,
-            filename=file.filename,
-        )
+        try:
+            video_id = handle_video_upload(
+                storage_client=storage_client,
+                publisher=publisher,
+                filename=file.filename,
+                content=content,
+            )
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        except Exception:
+            raise HTTPException(status_code=500, detail="Service unavailable")
+        
+        return VideoUploadResponse(video_id=video_id, filename=file.filename)
 
     return app
-
-
-app = create_app()
