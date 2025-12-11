@@ -1,9 +1,11 @@
 import pytest
 from pathlib import Path
+from typing import Optional
 from src.audio_extractor_service.domain import AudioExtractedEvent
 from src.transcription_service.domain import (
     TranscriptCreatedEvent,
     TranscriptionBackend,
+    StorageClient,
 )
 from src.transcription_service.worker import TranscriptEventPublisher
 
@@ -11,10 +13,10 @@ from src.transcription_service.worker import TranscriptEventPublisher
 class FakeTranscriptionBackend(TranscriptionBackend):
     def __init__(self, transcript_text: str) -> None:
         self.transcript_text = transcript_text
-        self.calls: list[Path] = []
+        self.calls: list[bytes] = []
 
-    def transcribe(self, audio_path: Path) -> str:
-        self.calls.append(audio_path)
+    def transcribe(self, audio_bytes: bytes) -> str:
+        self.calls.append(audio_bytes)
         return self.transcript_text
 
 
@@ -26,20 +28,35 @@ class FakeTranscriptEventPublisher(TranscriptEventPublisher):
         self.published_events.append(event)
 
 
-@pytest.fixture
-def fake_audio_path(tmp_path: Path) -> Path:
-    audio_dir = tmp_path / "audio"
-    audio_dir.mkdir(parents=True, exist_ok=True)
-    audio_file = audio_dir / "audio.mp3"
-    audio_file.write_bytes(b"fake audio content")
-    return audio_file
+class FakeStorageClient:
+    """Fake StorageClient that records download/upload calls."""
+    def __init__(self) -> None:
+        self.download_response: Optional[bytes] = None
+        self.download_called_with: Optional[dict] = None
+        self.upload_called_with: Optional[dict] = None
+    
+    def set_download_response(self, content: bytes) -> None:
+        self.download_response = content
+    
+    def download_file(self, bucket: str, key: str) -> bytes:
+        self.download_called_with = {"bucket": bucket, "key": key}
+        return self.download_response or b""
+    
+    def upload_file(self, bucket: str, key: str, content: bytes) -> None:
+        self.upload_called_with = {"bucket": bucket, "key": key, "content": content}
 
 
 @pytest.fixture
-def event(fake_audio_path: Path) -> AudioExtractedEvent:
+def audio_bytes() -> bytes:
+    return b"fake audio content"
+
+
+@pytest.fixture
+def event() -> AudioExtractedEvent:
     return AudioExtractedEvent(
         video_id="video-123",
-        audio_path=str(fake_audio_path),
+        bucket="therapy-audio",
+        key="audio/video-123/audio.mp3",
     )
 
 
@@ -54,5 +71,8 @@ def fake_publisher() -> FakeTranscriptEventPublisher:
 
 
 @pytest.fixture
-def base_output_dir(tmp_path: Path) -> Path:
-    return tmp_path / "data" / "transcripts"
+def fake_storage(audio_bytes: bytes) -> FakeStorageClient:
+    client = FakeStorageClient()
+    client.set_download_response(audio_bytes)
+    return client
+

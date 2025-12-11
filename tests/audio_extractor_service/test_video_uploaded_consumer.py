@@ -9,7 +9,11 @@ from src.audio_extractor_service.rabbitmq_consumer import (
     RabbitMQConsumerConfig,
     RabbitMQVideoUploadedConsumer,
 )
-from tests.audio_extractor_service.conftest import FakeAudioEventPublisher
+from tests.audio_extractor_service.conftest import (
+    FakeAudioEventPublisher,
+    FakeStorageClient,
+    FakeAudioConverter,
+)
 
 
 # --- Fixtures ---
@@ -32,16 +36,18 @@ def video_id() -> str:
 
 
 @pytest.fixture
-def base_output_dir(tmp_path: Path) -> Path:
-    return tmp_path / "data" / "audio"
+def filename() -> str:
+    return "test.mp4"
 
 
 @pytest.fixture
-def message_body(video_id: str, filename: str, video_path: Path) -> bytes:
+def message_body(video_id: str, filename: str) -> bytes:
     return json.dumps({
         "video_id": video_id,
         "filename": filename,
-        "storage_path": str(video_path),
+        "bucket": "therapy-videos",
+        "key": f"videos/{video_id}/{filename}",
+        "uploaded_at": "2025-12-12T12:00:00",
     }).encode("utf-8")
 
 
@@ -70,8 +76,11 @@ def mock_connection_with_callback(mocker, mock_channel_with_callback):
 @pytest.fixture
 def started_consumer(
     config: RabbitMQConsumerConfig,
-    base_output_dir: Path,
+    fake_storage_client: FakeStorageClient,
+    fake_audio_converter: FakeAudioConverter,
     fake_publisher: FakeAudioEventPublisher,
+    video_bytes: bytes,
+    audio_bytes: bytes,
     mock_channel_with_callback,
     mock_connection_with_callback,
     mocker,
@@ -79,10 +88,14 @@ def started_consumer(
     """Fixture that sets up and starts a consumer, returning the consumer, channel, and callback."""
     mocker.patch("pika.BlockingConnection", return_value=mock_connection_with_callback)
     mock_channel_with_callback.start_consuming.side_effect = KeyboardInterrupt
+    
+    fake_storage_client.set_download_response(video_bytes)
+    fake_audio_converter.set_convert_response(audio_bytes)
 
     consumer = RabbitMQVideoUploadedConsumer(
         config=config,
-        base_output_dir=base_output_dir,
+        storage_client=fake_storage_client,
+        audio_converter=fake_audio_converter,
         publisher=fake_publisher,
     )
 
@@ -100,7 +113,8 @@ def started_consumer(
 @pytest.mark.unit
 def test_should_connect_with_correct_parameters(
     config: RabbitMQConsumerConfig,
-    base_output_dir: Path,
+    fake_storage_client: FakeStorageClient,
+    fake_audio_converter: FakeAudioConverter,
     fake_publisher: FakeAudioEventPublisher,
     mocker,
     mock_connection,
@@ -111,7 +125,8 @@ def test_should_connect_with_correct_parameters(
 
     consumer = RabbitMQVideoUploadedConsumer(
         config=config,
-        base_output_dir=base_output_dir,
+        storage_client=fake_storage_client,
+        audio_converter=fake_audio_converter,
         publisher=fake_publisher,
     )
 
@@ -132,7 +147,8 @@ def test_should_connect_with_correct_parameters(
 @pytest.mark.unit
 def test_should_declare_queue_durable(
     config: RabbitMQConsumerConfig,
-    base_output_dir: Path,
+    fake_storage_client: FakeStorageClient,
+    fake_audio_converter: FakeAudioConverter,
     fake_publisher: FakeAudioEventPublisher,
     mocker,
     mock_connection,
@@ -143,7 +159,8 @@ def test_should_declare_queue_durable(
 
     consumer = RabbitMQVideoUploadedConsumer(
         config=config,
-        base_output_dir=base_output_dir,
+        storage_client=fake_storage_client,
+        audio_converter=fake_audio_converter,
         publisher=fake_publisher,
     )
 
@@ -159,30 +176,7 @@ def test_should_declare_queue_durable(
 
 
 @pytest.mark.unit
-def test_should_process_message_and_create_audio_file(
-    started_consumer: tuple,
-    message_body: bytes,
-    video_id: str,
-    video_bytes: bytes,
-    base_output_dir: Path,
-    mocker,
-):
-    consumer, mock_channel, callback = started_consumer
-    assert callback is not None
-
-    fake_method = mocker.MagicMock()
-    fake_method.delivery_tag = 42
-
-    callback(mock_channel, fake_method, None, message_body)
-
-    expected_audio_path = base_output_dir / video_id / "audio.mp3"
-    assert expected_audio_path.is_file()
-    contents = expected_audio_path.read_bytes()
-    assert contents == video_bytes
-
-
-@pytest.mark.unit
-def test_should_publish_audio_extracted_event(
+def test_should_process_message_and_publish_event(
     started_consumer: tuple,
     fake_publisher: FakeAudioEventPublisher,
     message_body: bytes,
@@ -200,6 +194,8 @@ def test_should_publish_audio_extracted_event(
     assert len(fake_publisher.published_events) == 1
     event = fake_publisher.published_events[0]
     assert event.video_id == video_id
+    assert event.bucket == "therapy-audio"
+    assert "audio.mp3" in event.key
 
 
 @pytest.mark.unit
@@ -224,11 +220,12 @@ def test_should_acknowledge_message_after_processing(
     (b"not-json", "non-JSON body"),
     (b'{"video_id": null}', "null video_id"),
     (b'{}', "empty JSON object"),
-    (b'{"video_id": "v1"}', "missing storage_path"),
+    (b'{"video_id": "v1"}', "missing bucket"),
 ])
 def test_should_handle_malformed_message_gracefully(
     config: RabbitMQConsumerConfig,
-    base_output_dir: Path,
+    fake_storage_client: FakeStorageClient,
+    fake_audio_converter: FakeAudioConverter,
     fake_publisher: FakeAudioEventPublisher,
     mocker,
     mock_connection,
@@ -247,7 +244,8 @@ def test_should_handle_malformed_message_gracefully(
 
     consumer = RabbitMQVideoUploadedConsumer(
         config=config,
-        base_output_dir=base_output_dir,
+        storage_client=fake_storage_client,
+        audio_converter=fake_audio_converter,
         publisher=fake_publisher,
     )
 

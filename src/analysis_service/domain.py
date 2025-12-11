@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from pathlib import Path
+from typing import Protocol
 
 from pydantic import BaseModel
 
@@ -12,6 +12,11 @@ class AnalysisResult(BaseModel):
     extra: dict = {}
 
 
+class StorageClient(Protocol):
+    def download_file(self, bucket: str, key: str) -> bytes:
+        ...
+
+
 class AnalysisBackend(ABC):
 
     @abstractmethod
@@ -20,18 +25,24 @@ class AnalysisBackend(ABC):
         ...
 
 
-def analyze_transcript(event: TranscriptCreatedEvent, backend: AnalysisBackend) -> AnalysisResult:
+def analyze_transcript(
+    event: TranscriptCreatedEvent,
+    backend: AnalysisBackend,
+    storage_client: StorageClient,
+) -> AnalysisResult:
     """Analyze a transcript from a TranscriptCreatedEvent.
 
     Args:
-        event: The TranscriptCreatedEvent containing the transcript path.
+        event: The TranscriptCreatedEvent containing the transcript bucket/key.
         backend: The analysis backend to use.
+        storage_client: The storage client to download the transcript.
 
     Returns:
         The AnalysisResult from the backend.
     """
-    transcript_path = Path(event.transcript_path)
-    transcript_text = transcript_path.read_text(encoding="utf-8")
+    transcript_bytes = storage_client.download_file(bucket=event.bucket, key=event.key)
+    transcript_text = transcript_bytes.decode("utf-8")
+    
     result = backend.analyze(transcript_text)
 
     if result.video_id != event.video_id:

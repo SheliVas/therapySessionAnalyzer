@@ -28,7 +28,8 @@ def config() -> RabbitMQConfig:
 def event() -> TranscriptCreatedEvent:
     return TranscriptCreatedEvent(
         video_id="video-123",
-        transcript_path="/data/transcripts/video-123/transcript.txt",
+        bucket="therapy-transcripts",
+        key="transcripts/video-123/transcript.txt",
     )
 
 
@@ -96,7 +97,8 @@ def test_should_publish_event_as_json_to_correct_queue(
 
     body_dict = json.loads(call_kwargs.get("body"))
     assert body_dict["video_id"] == event.video_id
-    assert body_dict["transcript_path"] == event.transcript_path
+    assert body_dict["bucket"] == event.bucket
+    assert body_dict["key"] == event.key
 
 
 @pytest.mark.unit

@@ -1,5 +1,3 @@
-from pathlib import Path
-
 import pytest
 
 from src.audio_extractor_service.domain import AudioExtractedEvent
@@ -7,6 +5,7 @@ from src.transcription_service.worker import process_audio_extracted_event
 from tests.transcription_service.conftest import (
     FakeTranscriptionBackend,
     FakeTranscriptEventPublisher,
+    FakeStorageClient,
 )
 
 
@@ -14,17 +13,17 @@ from tests.transcription_service.conftest import (
 
 
 @pytest.mark.unit
-def test_should_call_backend_transcribe_once_with_correct_audio_path(
+def test_should_call_backend_transcribe_once_with_downloaded_bytes(
     event: AudioExtractedEvent,
     fake_backend: FakeTranscriptionBackend,
     fake_publisher: FakeTranscriptEventPublisher,
-    base_output_dir: Path,
+    fake_storage: FakeStorageClient,
+    audio_bytes: bytes,
 ) -> None:
-    process_audio_extracted_event(event, base_output_dir, fake_backend, fake_publisher)
+    process_audio_extracted_event(event, fake_storage, fake_backend, fake_publisher)
 
     assert len(fake_backend.calls) == 1
-    expected_path = Path(event.audio_path)
-    assert fake_backend.calls[0] == expected_path
+    assert fake_backend.calls[0] == audio_bytes
 
 
 @pytest.mark.unit
@@ -32,25 +31,25 @@ def test_should_return_transcript_created_event_with_correct_video_id(
     event: AudioExtractedEvent,
     fake_backend: FakeTranscriptionBackend,
     fake_publisher: FakeTranscriptEventPublisher,
-    base_output_dir: Path,
+    fake_storage: FakeStorageClient,
 ) -> None:
-    result = process_audio_extracted_event(event, base_output_dir, fake_backend, fake_publisher)
+    result = process_audio_extracted_event(event, fake_storage, fake_backend, fake_publisher)
 
     assert result.video_id == event.video_id
 
 
 @pytest.mark.unit
-def test_should_return_transcript_path_pointing_to_existing_file(
+def test_should_upload_transcript_to_storage(
     event: AudioExtractedEvent,
     fake_backend: FakeTranscriptionBackend,
     fake_publisher: FakeTranscriptEventPublisher,
-    base_output_dir: Path,
+    fake_storage: FakeStorageClient,
 ) -> None:
-    result = process_audio_extracted_event(event, base_output_dir, fake_backend, fake_publisher)
+    process_audio_extracted_event(event, fake_storage, fake_backend, fake_publisher)
 
-    expected_path = base_output_dir / event.video_id / "transcript.txt"
-    assert Path(result.transcript_path) == expected_path
-    assert expected_path.exists()
+    assert fake_storage.upload_called_with is not None
+    assert fake_storage.upload_called_with["bucket"] == "therapy-transcripts"
+    assert fake_storage.upload_called_with["key"] == f"transcripts/{event.video_id}/transcript.txt"
 
 
 @pytest.mark.unit
@@ -58,9 +57,10 @@ def test_should_publish_exactly_one_event_equal_to_returned_event(
     event: AudioExtractedEvent,
     fake_backend: FakeTranscriptionBackend,
     fake_publisher: FakeTranscriptEventPublisher,
-    base_output_dir: Path,
+    fake_storage: FakeStorageClient,
 ) -> None:
-    result = process_audio_extracted_event(event, base_output_dir, fake_backend, fake_publisher)
+    result = process_audio_extracted_event(event, fake_storage, fake_backend, fake_publisher)
 
     assert len(fake_publisher.published_events) == 1
     assert fake_publisher.published_events[0] == result
+

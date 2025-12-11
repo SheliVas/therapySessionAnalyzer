@@ -1,5 +1,4 @@
 import json
-from pathlib import Path
 from typing import Callable, Any
 
 import pika
@@ -9,7 +8,11 @@ from src.transcription_service.rabbitmq_consumer import (
     RabbitMQConsumerConfig,
     RabbitMQAudioExtractedConsumer,
 )
-from tests.transcription_service.conftest import FakeTranscriptionBackend, FakeTranscriptEventPublisher
+from tests.transcription_service.conftest import (
+    FakeTranscriptionBackend,
+    FakeTranscriptEventPublisher,
+    FakeStorageClient,
+)
 
 
 # --- Fixtures ---
@@ -32,24 +35,11 @@ def video_id() -> str:
 
 
 @pytest.fixture
-def audio_bytes() -> bytes:
-    return b"fake-audio-content"
-
-
-@pytest.fixture
-def audio_path(tmp_path: Path, audio_bytes: bytes) -> Path:
-    audio_dir = tmp_path / "audio"
-    audio_dir.mkdir(parents=True, exist_ok=True)
-    audio_file = audio_dir / "audio.mp3"
-    audio_file.write_bytes(audio_bytes)
-    return audio_file
-
-
-@pytest.fixture
-def message_body(video_id: str, audio_path: Path) -> bytes:
+def message_body(video_id: str) -> bytes:
     return json.dumps({
         "video_id": video_id,
-        "audio_path": str(audio_path),
+        "bucket": "therapy-audio",
+        "key": f"audio/{video_id}/audio.mp3",
     }).encode("utf-8")
 
 
@@ -81,7 +71,7 @@ def mock_pika(mocker, mock_connection):
 @pytest.fixture
 def started_consumer(
     config: RabbitMQConsumerConfig,
-    base_output_dir: Path,
+    fake_storage: FakeStorageClient,
     fake_backend: FakeTranscriptionBackend,
     fake_publisher: FakeTranscriptEventPublisher,
     mock_channel,
@@ -91,7 +81,7 @@ def started_consumer(
     
     consumer = RabbitMQAudioExtractedConsumer(
         config=config,
-        base_output_dir=base_output_dir,
+        storage_client=fake_storage,
         backend=fake_backend,
         publisher=fake_publisher,
     )
@@ -110,7 +100,7 @@ def started_consumer(
 @pytest.mark.unit
 def test_should_connect_with_correct_parameters(
     config: RabbitMQConsumerConfig,
-    base_output_dir: Path,
+    fake_storage: FakeStorageClient,
     fake_backend: FakeTranscriptionBackend,
     fake_publisher: FakeTranscriptEventPublisher,
     mock_channel,
@@ -118,7 +108,7 @@ def test_should_connect_with_correct_parameters(
 ) -> None:
     consumer = RabbitMQAudioExtractedConsumer(
         config=config,
-        base_output_dir=base_output_dir,
+        storage_client=fake_storage,
         backend=fake_backend,
         publisher=fake_publisher,
     )
@@ -141,7 +131,7 @@ def test_should_connect_with_correct_parameters(
 @pytest.mark.unit
 def test_should_declare_queue_durable(
     config: RabbitMQConsumerConfig,
-    base_output_dir: Path,
+    fake_storage: FakeStorageClient,
     fake_backend: FakeTranscriptionBackend,
     fake_publisher: FakeTranscriptEventPublisher,
     mock_channel,
@@ -149,7 +139,7 @@ def test_should_declare_queue_durable(
 ) -> None:
     consumer = RabbitMQAudioExtractedConsumer(
         config=config,
-        base_output_dir=base_output_dir,
+        storage_client=fake_storage,
         backend=fake_backend,
         publisher=fake_publisher,
     )
@@ -168,12 +158,12 @@ def test_should_declare_queue_durable(
 
 
 @pytest.mark.unit
-def test_should_process_message_and_create_transcript_file(
+def test_should_process_message_and_upload_transcript(
     started_consumer: tuple,
     fake_backend: FakeTranscriptionBackend,
+    fake_storage: FakeStorageClient,
     message_body: bytes,
     video_id: str,
-    base_output_dir: Path,
     mocker,
 ) -> None:
     consumer, mock_channel, callback = started_consumer
@@ -184,19 +174,18 @@ def test_should_process_message_and_create_transcript_file(
 
     callback(mock_channel, fake_method, None, message_body)
 
-    expected_transcript_path = base_output_dir / video_id / "transcript.txt"
-    assert expected_transcript_path.is_file()
-
-    contents = expected_transcript_path.read_text()
-    assert contents == fake_backend.transcript_text
+    assert fake_storage.upload_called_with is not None
+    assert fake_storage.upload_called_with["bucket"] == "therapy-transcripts"
+    assert fake_storage.upload_called_with["key"] == f"transcripts/{video_id}/transcript.txt"
+    assert fake_storage.upload_called_with["content"] == fake_backend.transcript_text.encode("utf-8")
 
 
 @pytest.mark.unit
-def test_should_call_backend_with_correct_audio_path(
+def test_should_call_backend_with_downloaded_bytes(
     started_consumer: tuple,
     fake_backend: FakeTranscriptionBackend,
     message_body: bytes,
-    audio_path: Path,
+    audio_bytes: bytes,
     mocker,
 ) -> None:
 
@@ -209,7 +198,7 @@ def test_should_call_backend_with_correct_audio_path(
     callback(mock_channel, fake_method, None, message_body)
 
     assert len(fake_backend.calls) == 1
-    assert fake_backend.calls[0] == audio_path
+    assert fake_backend.calls[0] == audio_bytes
 
 
 @pytest.mark.unit
@@ -231,6 +220,8 @@ def test_should_publish_transcript_created_event(
     assert len(fake_publisher.published_events) == 1
     event = fake_publisher.published_events[0]
     assert event.video_id == video_id
+    assert event.bucket == "therapy-transcripts"
+    assert event.key == f"transcripts/{video_id}/transcript.txt"
 
 
 @pytest.mark.unit
@@ -250,17 +241,16 @@ def test_should_acknowledge_message_after_processing(
     mock_channel.basic_ack.assert_called_once_with(delivery_tag=42)
 
 
-
 @pytest.mark.unit
 @pytest.mark.parametrize("invalid_body,description", [
     (b"not-json", "non-JSON body"),
     (b'{"video_id": null}', "null video_id"),
     (b'{}', "empty JSON object"),
-    (b'{"video_id": "v1"}', "missing audio_path"),
+    (b'{"video_id": "v1"}', "missing bucket"),
 ])
 def test_should_handle_malformed_message_gracefully(
     config: RabbitMQConsumerConfig,
-    base_output_dir: Path,
+    fake_storage: FakeStorageClient,
     fake_backend: FakeTranscriptionBackend,
     fake_publisher: FakeTranscriptEventPublisher,
     mock_channel,
@@ -273,7 +263,7 @@ def test_should_handle_malformed_message_gracefully(
     
     consumer = RabbitMQAudioExtractedConsumer(
         config=config,
-        base_output_dir=base_output_dir,
+        storage_client=fake_storage,
         backend=fake_backend,
         publisher=fake_publisher,
     )

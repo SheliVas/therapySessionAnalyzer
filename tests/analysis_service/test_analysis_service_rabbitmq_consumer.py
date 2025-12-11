@@ -9,7 +9,12 @@ from src.analysis_service.rabbitmq_consumer import (
     RabbitMQConsumerConfig,
     RabbitMQTranscriptCreatedConsumer,
 )
-from tests.analysis_service.conftest import FakeAnalysisBackend, FakeAnalysisEventPublisher, FakeAnalysisRepository
+from tests.analysis_service.conftest import (
+    FakeAnalysisBackend,
+    FakeAnalysisEventPublisher,
+    FakeAnalysisRepository,
+    FakeStorageClient,
+)
 
 
 # --- Fixtures ---
@@ -32,17 +37,11 @@ def transcript_text() -> str:
 
 
 @pytest.fixture
-def transcript_path(tmp_path: Path, transcript_text: str) -> str:
-    transcript_file = tmp_path / "transcript.txt"
-    transcript_file.write_text(transcript_text)
-    return str(transcript_file)
-
-
-@pytest.fixture
-def message_body(video_id: str, transcript_path: str) -> bytes:
+def message_body(video_id: str) -> bytes:
     return json.dumps({
         "video_id": video_id,
-        "transcript_path": transcript_path,
+        "bucket": "therapy-transcripts",
+        "key": f"transcripts/{video_id}/transcript.txt",
     }).encode("utf-8")
 
 
@@ -77,6 +76,7 @@ def started_consumer(
     fake_backend: FakeAnalysisBackend,
     fake_publisher: FakeAnalysisEventPublisher,
     fake_repository: FakeAnalysisRepository,
+    fake_storage_client: FakeStorageClient,
     mock_channel,
     mock_pika,
 ) -> tuple[RabbitMQTranscriptCreatedConsumer, Any, Callable]:
@@ -88,6 +88,7 @@ def started_consumer(
         backend=fake_backend,
         publisher=fake_publisher,
         repository=fake_repository,
+        storage_client=fake_storage_client,
     )
     
     try:
@@ -107,6 +108,7 @@ def test_should_connect_with_correct_parameters(
     fake_backend: FakeAnalysisBackend,
     fake_publisher: FakeAnalysisEventPublisher,
     fake_repository: FakeAnalysisRepository,
+    fake_storage_client: FakeStorageClient,
     mock_channel,
     mock_pika,
 ):
@@ -115,6 +117,7 @@ def test_should_connect_with_correct_parameters(
         backend=fake_backend,
         publisher=fake_publisher,
         repository=fake_repository,
+        storage_client=fake_storage_client,
     )
 
     mock_channel.start_consuming.side_effect = KeyboardInterrupt
@@ -138,6 +141,7 @@ def test_should_declare_queue_durable(
     fake_backend: FakeAnalysisBackend,
     fake_publisher: FakeAnalysisEventPublisher,
     fake_repository: FakeAnalysisRepository,
+    fake_storage_client: FakeStorageClient,
     mock_channel,
     mock_pika,
 ):
@@ -146,6 +150,7 @@ def test_should_declare_queue_durable(
         backend=fake_backend,
         publisher=fake_publisher,
         repository=fake_repository,
+        storage_client=fake_storage_client,
     )
 
     mock_channel.start_consuming.side_effect = KeyboardInterrupt
@@ -248,13 +253,14 @@ def test_should_acknowledge_message_after_processing(
     (b"not-json", "non-JSON body"),
     (b'{"video_id": null}', "null video_id"),
     (b'{}', "empty JSON object"),
-    (b'{"video_id": "v1"}', "missing transcript_path"),
+    (b'{"video_id": "v1"}', "missing bucket"),
 ])
 def test_should_handle_malformed_message_gracefully(
     config: RabbitMQConsumerConfig,
     fake_backend: FakeAnalysisBackend,
     fake_publisher: FakeAnalysisEventPublisher,
     fake_repository: FakeAnalysisRepository,
+    fake_storage_client: FakeStorageClient,
     mock_channel,
     mock_pika,
     invalid_body: bytes,
@@ -268,6 +274,7 @@ def test_should_handle_malformed_message_gracefully(
         backend=fake_backend,
         publisher=fake_publisher,
         repository=fake_repository,
+        storage_client=fake_storage_client,
     )
     
     try:

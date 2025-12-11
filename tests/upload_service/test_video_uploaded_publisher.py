@@ -1,4 +1,5 @@
 import json
+from datetime import datetime
 
 import pika
 import pytest
@@ -29,7 +30,9 @@ def event() -> VideoUploadedEvent:
     return VideoUploadedEvent(
         video_id="video-123",
         filename="session1.mp4",
-        storage_path="data/uploads/video-123/session1.mp4",
+        bucket="therapy-videos",
+        key="videos/video-123/session1.mp4",
+        uploaded_at=datetime(2025, 12, 12, 12, 0, 0),
     )
 
 
@@ -98,7 +101,9 @@ def test_should_publish_event_as_json_to_correct_queue(
     body_dict = json.loads(call_kwargs.get("body"))
     assert body_dict["video_id"] == event.video_id
     assert body_dict["filename"] == event.filename
-    assert body_dict["storage_path"] == event.storage_path
+    assert body_dict["bucket"] == event.bucket
+    assert body_dict["key"] == event.key
+    assert "uploaded_at" in body_dict
 
 
 @pytest.mark.unit
@@ -117,10 +122,11 @@ def test_should_close_connection_after_publishing(
 
 
 @pytest.mark.unit
-@pytest.mark.parametrize("video_id,filename,storage_path", [
-    ("", "test.mp4", "path/test.mp4"),
-    ("vid-1", "", "path/test.mp4"),
-    ("vid-1", "test.mp4", ""),
+@pytest.mark.parametrize("video_id,filename,bucket,key", [
+    ("", "test.mp4", "bucket", "key"),
+    ("vid-1", "", "bucket", "key"),
+    ("vid-1", "test.mp4", "", "key"),
+    ("vid-1", "test.mp4", "bucket", ""),
 ])
 def test_should_publish_event_with_empty_fields(
     config: RabbitMQConfig,
@@ -129,13 +135,16 @@ def test_should_publish_event_with_empty_fields(
     mock_channel,
     video_id: str,
     filename: str,
-    storage_path: str,
+    bucket: str,
+    key: str,
 ):
     mocker.patch("pika.BlockingConnection", return_value=mock_connection)
     event = VideoUploadedEvent(
         video_id=video_id,
         filename=filename,
-        storage_path=storage_path,
+        bucket=bucket,
+        key=key,
+        uploaded_at=datetime.now(),
     )
 
     publisher = RabbitMQVideoEventPublisher(config)

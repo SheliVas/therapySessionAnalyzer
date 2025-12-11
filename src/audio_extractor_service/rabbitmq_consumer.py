@@ -1,11 +1,15 @@
 import json
-from pathlib import Path
 
 import pika
 from pydantic import BaseModel
 
 from src.upload_service.domain import VideoUploadedEvent
-from src.audio_extractor_service.worker import AudioEventPublisher, process_video_uploaded_event
+from src.audio_extractor_service.domain import (
+    AudioEventPublisher,
+    StorageClient,
+    AudioConverter,
+)
+from src.audio_extractor_service.worker import process_video_uploaded_event
 
 
 class RabbitMQConsumerConfig(BaseModel):
@@ -20,11 +24,13 @@ class RabbitMQVideoUploadedConsumer:
     def __init__(
         self,
         config: RabbitMQConsumerConfig,
-        base_output_dir: Path,
+        storage_client: StorageClient,
+        audio_converter: AudioConverter,
         publisher: AudioEventPublisher,
     ) -> None:
         self._config = config
-        self._base_output_dir = base_output_dir
+        self._storage_client = storage_client
+        self._audio_converter = audio_converter
         self._publisher = publisher
 
     def run_forever(self) -> None:
@@ -48,7 +54,8 @@ class RabbitMQVideoUploadedConsumer:
 
             process_video_uploaded_event(
                 event,
-                base_output_dir=self._base_output_dir,
+                storage_client=self._storage_client,
+                audio_converter=self._audio_converter,
                 publisher=self._publisher,
             )
 

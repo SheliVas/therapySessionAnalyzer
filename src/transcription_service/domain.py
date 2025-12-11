@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from pathlib import Path
+from typing import Protocol
 
 from pydantic import BaseModel
 
@@ -8,42 +8,59 @@ from src.audio_extractor_service.domain import AudioExtractedEvent
 
 class TranscriptCreatedEvent(BaseModel):
     video_id: str
-    transcript_path: str
+    bucket: str
+    key: str
+
+
+class StorageClient(Protocol):
+    def download_file(self, bucket: str, key: str) -> bytes:
+        ...
+
+    def upload_file(self, bucket: str, key: str, content: bytes) -> None:
+        ...
 
 
 class TranscriptionBackend(ABC):
     @abstractmethod
-    def transcribe(self, audio_path: Path) -> str:
-        """Transcribe audio at the given path and return the transcript text."""
+    def transcribe(self, audio_bytes: bytes) -> str:
+        """Transcribe audio bytes and return the transcript text."""
         ...
 
 
 def generate_transcript(
     event: AudioExtractedEvent,
     backend: TranscriptionBackend,
-    base_output_dir: Path,
+    storage_client: StorageClient,
 ) -> TranscriptCreatedEvent:
     """
     Generate a transcript from an audio file.
 
     Args:
-        event: The AudioExtractedEvent containing the audio path.
+        event: The AudioExtractedEvent containing the audio bucket/key.
         backend: The transcription backend to use.
-        base_output_dir: The base directory to write transcripts to.
+        storage_client: The storage client to download audio and upload transcript.
 
     Returns:
-        A TranscriptCreatedEvent with the path to the transcript file.
+        A TranscriptCreatedEvent with the bucket/key to the transcript file.
     """
-    audio_path = Path(event.audio_path)
-    transcript_text = backend.transcribe(audio_path)
+    audio_bytes = storage_client.download_file(bucket=event.bucket, key=event.key)
+    
+    if not audio_bytes:
+        raise ValueError("Downloaded audio is empty")
 
-    output_dir = base_output_dir / event.video_id
-    output_dir.mkdir(parents=True, exist_ok=True)
+    transcript_text = backend.transcribe(audio_bytes)
 
-    transcript_path = output_dir / "transcript.txt"
-    transcript_path.write_text(transcript_text)
+    transcript_bucket = "therapy-transcripts"
+    transcript_key = f"transcripts/{event.video_id}/transcript.txt"
+    
+    storage_client.upload_file(
+        bucket=transcript_bucket,
+        key=transcript_key,
+        content=transcript_text.encode("utf-8")
+    )
 
     return TranscriptCreatedEvent(
         video_id=event.video_id,
-        transcript_path=str(transcript_path),
+        bucket=transcript_bucket,
+        key=transcript_key,
     )

@@ -5,7 +5,7 @@ import pika
 from pydantic import BaseModel
 
 from src.transcription_service.domain import TranscriptCreatedEvent
-from src.analysis_service.domain import AnalysisBackend
+from src.analysis_service.domain import AnalysisBackend, StorageClient
 from src.analysis_service.worker import (
     AnalysisEventPublisher,
     AnalysisRepository,
@@ -30,6 +30,7 @@ class RabbitMQTranscriptCreatedConsumer:
         backend: AnalysisBackend,
         publisher: AnalysisEventPublisher,
         repository: AnalysisRepository,
+        storage_client: StorageClient,
     ) -> None:
         """Initialize the consumer.
 
@@ -38,11 +39,13 @@ class RabbitMQTranscriptCreatedConsumer:
             backend: Analysis backend to use.
             publisher: Event publisher to use.
             repository: Repository to save analysis results.
+            storage_client: Storage client to download transcripts.
         """
         self._config = config
         self._backend = backend
         self._publisher = publisher
         self._repository = repository
+        self._storage_client = storage_client
 
     def run_forever(self) -> None:
         """Start consuming messages from the queue.
@@ -79,6 +82,7 @@ class RabbitMQTranscriptCreatedConsumer:
                 backend=self._backend,
                 publisher=self._publisher,
                 repository=self._repository,
+                storage_client=self._storage_client,
             )
 
             ch.basic_ack(delivery_tag=method.delivery_tag)

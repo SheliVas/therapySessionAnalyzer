@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from pydantic import BaseModel
 
 from src.transcription_service.domain import TranscriptCreatedEvent
-from src.analysis_service.domain import AnalysisBackend, analyze_transcript
+from src.analysis_service.domain import AnalysisBackend, analyze_transcript, StorageClient
 
 
 class AnalysisCompletedEvent(BaseModel):
@@ -31,6 +31,7 @@ def process_transcript_created_event(
     backend: AnalysisBackend,
     publisher: AnalysisEventPublisher,
     repository: AnalysisRepository,
+    storage_client: StorageClient,
 ) -> AnalysisCompletedEvent:
     """Process a TranscriptCreatedEvent and publish an AnalysisCompletedEvent.
 
@@ -39,11 +40,12 @@ def process_transcript_created_event(
         backend: The analysis backend to use.
         publisher: The event publisher to use.
         repository: The repository to save the analysis to.
+        storage_client: The storage client to download the transcript.
 
     Returns:
         The AnalysisCompletedEvent that was published and saved.
     """
-    analysis_result = analyze_transcript(event, backend)
+    analysis_result = analyze_transcript(event, backend, storage_client)
     completed_event = AnalysisCompletedEvent(
         video_id=analysis_result.video_id,
         word_count=analysis_result.word_count,

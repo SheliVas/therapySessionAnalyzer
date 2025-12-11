@@ -12,14 +12,23 @@ from src.transcription_service.rabbitmq_publisher import (
     RabbitMQConfig as PublisherConfig,
     RabbitMQTranscriptEventPublisher,
 )
-from src.transcription_service.domain import TranscriptionBackend
+from src.transcription_service.domain import TranscriptionBackend, StorageClient
 
 
 class StubTranscriptionBackend(TranscriptionBackend):
     """Stub backend that returns a placeholder transcript."""
 
-    def transcribe(self, audio_path: Path) -> str:
-        return f"[Stub transcript for {audio_path.name}]"
+    def transcribe(self, audio_bytes: bytes) -> str:
+        return f"[Stub transcript for {len(audio_bytes)} bytes]"
+
+
+class StubStorageClient:
+    """Stub storage client."""
+    def download_file(self, bucket: str, key: str) -> bytes:
+        return b"stub-audio-content"
+    
+    def upload_file(self, bucket: str, key: str, content: bytes) -> None:
+        print(f"Uploaded {len(content)} bytes to {bucket}/{key}")
 
 
 def main() -> None:
@@ -39,15 +48,13 @@ def main() -> None:
         queue_name=os.environ.get("TRANSCRIPT_CREATED_QUEUE", "transcript.created"),
     )
 
-    base_output_dir = Path(
-        os.environ.get("TRANSCRIPT_OUTPUT_BASE_DIR", "/app/data/transcripts")
-    )
     publisher = RabbitMQTranscriptEventPublisher(publisher_config)
     backend = StubTranscriptionBackend()
+    storage_client = StubStorageClient()
 
     consumer = RabbitMQAudioExtractedConsumer(
         config=consumer_config,
-        base_output_dir=base_output_dir,
+        storage_client=storage_client,
         backend=backend,
         publisher=publisher,
     )

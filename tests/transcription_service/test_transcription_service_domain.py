@@ -1,5 +1,6 @@
 """Tests for transcription_service domain logic."""
 from pathlib import Path
+from typing import Optional
 
 import pytest
 
@@ -8,6 +9,7 @@ from src.transcription_service.domain import (
     TranscriptCreatedEvent,
     TranscriptionBackend,
     generate_transcript,
+    StorageClient,
 )
 
 
@@ -16,32 +18,46 @@ class FakeTranscriptionBackend(TranscriptionBackend):
 
     def __init__(self, transcript_text: str) -> None:
         self.transcript_text = transcript_text
-        self.calls: list[Path] = []
+        self.calls: list[bytes] = []
 
-    def transcribe(self, audio_path: Path) -> str:
-        self.calls.append(audio_path)
+    def transcribe(self, audio_bytes: bytes) -> str:
+        self.calls.append(audio_bytes)
         return self.transcript_text
+
+
+class FakeStorageClient:
+    """Fake StorageClient that records download/upload calls."""
+    def __init__(self) -> None:
+        self.download_response: Optional[bytes] = None
+        self.download_called_with: Optional[dict] = None
+        self.upload_called_with: Optional[dict] = None
+    
+    def set_download_response(self, content: bytes) -> None:
+        self.download_response = content
+    
+    def download_file(self, bucket: str, key: str) -> bytes:
+        self.download_called_with = {"bucket": bucket, "key": key}
+        return self.download_response or b""
+    
+    def upload_file(self, bucket: str, key: str, content: bytes) -> None:
+        self.upload_called_with = {"bucket": bucket, "key": key, "content": content}
 
 
 # --- Fixtures ---
 
 
 @pytest.fixture
-def fake_audio_path(tmp_path: Path) -> Path:
-    """Create a fake audio file and return its path."""
-    audio_dir = tmp_path / "audio"
-    audio_dir.mkdir(parents=True, exist_ok=True)
-    audio_file = audio_dir / "audio.mp3"
-    audio_file.write_bytes(b"fake audio content")
-    return audio_file
+def audio_bytes() -> bytes:
+    return b"fake audio content"
 
 
 @pytest.fixture
-def event(fake_audio_path: Path) -> AudioExtractedEvent:
+def event() -> AudioExtractedEvent:
     """Create an AudioExtractedEvent for testing."""
     return AudioExtractedEvent(
         video_id="video-123",
-        audio_path=str(fake_audio_path),
+        bucket="therapy-audio",
+        key="audio/video-123/audio.mp3",
     )
 
 
@@ -52,77 +68,66 @@ def fake_backend() -> FakeTranscriptionBackend:
 
 
 @pytest.fixture
-def base_output_dir(tmp_path: Path) -> Path:
-    """Return the base output directory for transcripts."""
-    return tmp_path / "data" / "transcripts"
+def fake_storage(audio_bytes: bytes) -> FakeStorageClient:
+    client = FakeStorageClient()
+    client.set_download_response(audio_bytes)
+    return client
 
 
 # --- Unit Tests ---
 
 
 @pytest.mark.unit
-def test_should_call_backend_once_with_correct_audio_path_when_event_received(
+def test_should_download_audio_from_storage(
     event: AudioExtractedEvent,
     fake_backend: FakeTranscriptionBackend,
-    base_output_dir: Path,
+    fake_storage: FakeStorageClient,
 ) -> None:
-    """Backend should be called exactly once with the audio path from the event."""
-    generate_transcript(event, fake_backend, base_output_dir)
+    generate_transcript(event, fake_backend, fake_storage)
+
+    assert fake_storage.download_called_with == {
+        "bucket": event.bucket,
+        "key": event.key,
+    }
+
+
+@pytest.mark.unit
+def test_should_call_backend_with_downloaded_bytes(
+    event: AudioExtractedEvent,
+    fake_backend: FakeTranscriptionBackend,
+    fake_storage: FakeStorageClient,
+    audio_bytes: bytes,
+) -> None:
+    generate_transcript(event, fake_backend, fake_storage)
 
     assert len(fake_backend.calls) == 1
-    expected_path = Path(event.audio_path)
-    assert fake_backend.calls[0] == expected_path
+    assert fake_backend.calls[0] == audio_bytes
 
 
 @pytest.mark.unit
-def test_should_return_transcript_created_event_with_correct_video_id(
+def test_should_upload_transcript_to_storage(
     event: AudioExtractedEvent,
     fake_backend: FakeTranscriptionBackend,
-    base_output_dir: Path,
+    fake_storage: FakeStorageClient,
 ) -> None:
-    """Returned event should have the same video_id as the input event."""
-    result = generate_transcript(event, fake_backend, base_output_dir)
+    generate_transcript(event, fake_backend, fake_storage)
 
+    assert fake_storage.upload_called_with is not None
+    assert fake_storage.upload_called_with["bucket"] == "therapy-transcripts"
+    assert fake_storage.upload_called_with["key"] == f"transcripts/{event.video_id}/transcript.txt"
+    assert fake_storage.upload_called_with["content"] == fake_backend.transcript_text.encode("utf-8")
+
+
+@pytest.mark.unit
+def test_should_return_transcript_created_event_with_correct_metadata(
+    event: AudioExtractedEvent,
+    fake_backend: FakeTranscriptionBackend,
+    fake_storage: FakeStorageClient,
+) -> None:
+    result = generate_transcript(event, fake_backend, fake_storage)
+
+    assert isinstance(result, TranscriptCreatedEvent)
     assert result.video_id == event.video_id
+    assert result.bucket == "therapy-transcripts"
+    assert result.key == f"transcripts/{event.video_id}/transcript.txt"
 
-
-@pytest.mark.unit
-def test_should_return_transcript_path_pointing_to_existing_file(
-    event: AudioExtractedEvent,
-    fake_backend: FakeTranscriptionBackend,
-    base_output_dir: Path,
-) -> None:
-    """Returned event should have a transcript_path that points to an existing file."""
-    result = generate_transcript(event, fake_backend, base_output_dir)
-
-    transcript_file = Path(result.transcript_path)
-    assert transcript_file.exists()
-
-
-@pytest.mark.unit
-def test_should_create_transcript_file_in_correct_location(
-    event: AudioExtractedEvent,
-    fake_backend: FakeTranscriptionBackend,
-    base_output_dir: Path,
-) -> None:
-    """Transcript file should be at base_output_dir / video_id / transcript.txt."""
-    result = generate_transcript(event, fake_backend, base_output_dir)
-
-    expected_path = base_output_dir / event.video_id / "transcript.txt"
-    assert Path(result.transcript_path) == expected_path
-    assert expected_path.exists()
-
-
-@pytest.mark.unit
-def test_should_write_correct_transcript_content_to_file(
-    event: AudioExtractedEvent,
-    fake_backend: FakeTranscriptionBackend,
-    base_output_dir: Path,
-) -> None:
-    """Transcript file should contain the text returned by the backend."""
-    result = generate_transcript(event, fake_backend, base_output_dir)
-
-    transcript_file = Path(result.transcript_path)
-    actual_content = transcript_file.read_text()
-    expected_content = fake_backend.transcript_text
-    assert actual_content == expected_content

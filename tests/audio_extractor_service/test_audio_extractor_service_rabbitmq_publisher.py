@@ -25,7 +25,8 @@ def config() -> RabbitMQConfig:
 def event() -> AudioExtractedEvent:
     return AudioExtractedEvent(
         video_id="video-123",
-        audio_path="/data/audio/video-123/audio.mp3",
+        bucket="therapy-audio",
+        key="audio/video-123/audio.mp3",
     )
 
 
@@ -89,7 +90,8 @@ def test_should_publish_event_as_json_to_correct_queue(
 
     body_dict = json.loads(call_kwargs.get("body"))
     assert body_dict["video_id"] == event.video_id
-    assert body_dict["audio_path"] == event.audio_path
+    assert body_dict["bucket"] == event.bucket
+    assert body_dict["key"] == event.key
 
 
 def test_should_close_connection_after_publishing(

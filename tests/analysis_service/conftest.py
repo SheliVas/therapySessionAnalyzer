@@ -1,6 +1,6 @@
 import pytest
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, Protocol
 from src.transcription_service.domain import TranscriptCreatedEvent
 from src.analysis_service.domain import AnalysisBackend, AnalysisResult
 from src.analysis_service.llm_client import LLMClient
@@ -9,6 +9,33 @@ from src.analysis_service.worker import (
     AnalysisEventPublisher,
     AnalysisRepository,
 )
+
+
+class StorageClient(Protocol):
+    def download_file(self, bucket: str, key: str) -> bytes:
+        ...
+
+    def upload_file(self, bucket: str, key: str, content: bytes) -> None:
+        ...
+
+
+class FakeStorageClient:
+    def __init__(self) -> None:
+        self.files: Dict[str, bytes] = {}
+        self.upload_calls: list[tuple[str, str, bytes]] = []
+
+    def download_file(self, bucket: str, key: str) -> bytes:
+        path = f"{bucket}/{key}"
+        return self.files.get(path, b"")
+
+    def upload_file(self, bucket: str, key: str, content: bytes) -> None:
+        path = f"{bucket}/{key}"
+        self.files[path] = content
+        self.upload_calls.append((bucket, key, content))
+
+    def add_file(self, bucket: str, key: str, content: bytes) -> None:
+        path = f"{bucket}/{key}"
+        self.files[path] = content
 
 
 class FakeAnalysisBackend(AnalysisBackend):
@@ -51,25 +78,25 @@ class FakeLLMClient(LLMClient):
         return self.return_value
 
 
-
-@pytest.fixture
-def fake_transcript_path(tmp_path: Path) -> str:
-    transcript_file = tmp_path / "transcript.txt"
-    transcript_file.write_text("hello world hello")
-    return str(transcript_file)
-
-
 @pytest.fixture
 def video_id() -> str:
     return "video-123"
 
 
 @pytest.fixture
-def event(fake_transcript_path: str, video_id: str) -> TranscriptCreatedEvent:
+def event(video_id: str) -> TranscriptCreatedEvent:
     return TranscriptCreatedEvent(
         video_id=video_id,
-        transcript_path=fake_transcript_path,
+        bucket="therapy-transcripts",
+        key=f"transcripts/{video_id}/transcript.txt",
     )
+
+
+@pytest.fixture
+def fake_storage_client(event: TranscriptCreatedEvent) -> FakeStorageClient:
+    client = FakeStorageClient()
+    client.add_file(event.bucket, event.key, b"hello world hello")
+    return client
 
 
 @pytest.fixture

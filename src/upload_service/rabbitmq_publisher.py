@@ -35,7 +35,7 @@ class RabbitMQVideoEventPublisher(VideoEventPublisher):
 
             channel.queue_declare(queue=self._config.queue_name, durable=True)
 
-            body = json.dumps(event.model_dump()).encode("utf-8")
+            body = event.model_dump_json().encode("utf-8")
 
             channel.basic_publish(
                 exchange="",
