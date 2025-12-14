@@ -4,9 +4,10 @@ from datetime import datetime
 from pathlib import Path
 
 from src.upload_service.domain import VideoEventPublisher, handle_video_upload
-from src.upload_service.config import get_rabbitmq_config
+from src.upload_service.config import get_rabbitmq_config, get_minio_config
 from src.upload_service.storage import StorageClient
 from src.upload_service.rabbitmq_publisher import RabbitMQVideoEventPublisher
+from src.shared.minio_storage import MinioStorage
 
 
 class VideoUploadResponse(BaseModel):
@@ -15,11 +16,9 @@ class VideoUploadResponse(BaseModel):
 
 
 def create_production_app() -> FastAPI:
-    config = get_rabbitmq_config()
-    publisher = RabbitMQVideoEventPublisher(config)
-    # TODO: Wire up MinioStorage once implemented
-    # storage_client = MinioStorage(get_minio_config())
-    return create_app(storage_client=publisher, publisher=publisher)
+    storage_client = MinioStorage(get_minio_config())
+    publisher = RabbitMQVideoEventPublisher(get_rabbitmq_config())
+    return create_app(storage_client=storage_client, publisher=publisher)
 
 
 def create_app(
