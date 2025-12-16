@@ -6,27 +6,6 @@ from src.upload_service.domain import VideoUploadedEvent
 from src.audio_extractor_service.domain import AudioExtractedEvent
 
 
-class FakeStorageClient:
-    """Fake StorageClient that records download/upload calls."""
-    def __init__(self) -> None:
-        self.download_response: Optional[bytes] = None
-        self.download_called_with: Optional[dict] = None
-        self.upload_called_with: Optional[dict] = None
-    
-    def set_download_response(self, content: bytes) -> None:
-        """Set the response for download_file calls."""
-        self.download_response = content
-    
-    def download_file(self, bucket: str, key: str) -> bytes:
-        """Record the call and return the set response."""
-        self.download_called_with = {"bucket": bucket, "key": key}
-        return self.download_response or b""
-    
-    def upload_file(self, bucket: str, key: str, content: bytes) -> None:
-        """Record the upload call."""
-        self.upload_called_with = {"bucket": bucket, "key": key, "content": content}
-
-
 class FakeAudioConverter:
     """Fake AudioConverter that records convert calls."""
     def __init__(self) -> None:
@@ -51,28 +30,7 @@ class FakeAudioEventPublisher:
         self.published_events.append(event)
 
 
-class FakeVideosRepository:
-    """Fake repository for testing video status updates."""
-    def __init__(self) -> None:
-        self.mark_audio_extracted_calls: list[dict] = []
-        self.should_raise_error = False
-    
-    def mark_audio_extracted(self, video_id: str, audio_path: str) -> None:
-        """Record the call."""
-        self.mark_audio_extracted_calls.append({
-            "video_id": video_id,
-            "audio_path": audio_path,
-        })
-        if self.should_raise_error:
-            raise ValueError("Repository error")
-
-
 # --- Fixtures: Fakes ---
-
-@pytest.fixture
-def fake_storage_client() -> FakeStorageClient:
-    """Fixture for FakeStorageClient."""
-    return FakeStorageClient()
 
 
 @pytest.fixture
@@ -85,12 +43,6 @@ def fake_audio_converter() -> FakeAudioConverter:
 def fake_audio_publisher() -> FakeAudioEventPublisher:
     """Fixture for FakeAudioEventPublisher."""
     return FakeAudioEventPublisher()
-
-
-@pytest.fixture
-def fake_videos_repository() -> FakeVideosRepository:
-    """Fixture for FakeVideosRepository."""
-    return FakeVideosRepository()
 
 
 # --- Fixtures: Test Data ---
@@ -135,8 +87,8 @@ def video_uploaded_event(video_id: str, filename: str) -> VideoUploadedEvent:
 
 @pytest.fixture
 def configured_storage_and_converter(
-    fake_storage_client: FakeStorageClient,
-    fake_audio_converter: FakeAudioConverter,
+    fake_storage_client,
+    fake_audio_converter,
     video_bytes: bytes,
     audio_bytes: bytes,
 ):

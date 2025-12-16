@@ -28,40 +28,6 @@ class FakeTranscriptEventPublisher(TranscriptEventPublisher):
         self.published_events.append(event)
 
 
-class FakeStorageClient:
-    """Fake StorageClient that records download/upload calls."""
-    def __init__(self) -> None:
-        self.download_response: Optional[bytes] = None
-        self.download_called_with: Optional[dict] = None
-        self.upload_called_with: Optional[dict] = None
-    
-    def set_download_response(self, content: bytes) -> None:
-        self.download_response = content
-    
-    def download_file(self, bucket: str, key: str) -> bytes:
-        self.download_called_with = {"bucket": bucket, "key": key}
-        return self.download_response or b""
-    
-    def upload_file(self, bucket: str, key: str, content: bytes) -> None:
-        self.upload_called_with = {"bucket": bucket, "key": key, "content": content}
-
-
-class FakeVideosRepository:
-    """Fake repository for testing video status updates."""
-    def __init__(self) -> None:
-        self.mark_transcribed_calls: list[dict] = []
-        self.should_raise_error = False
-    
-    def mark_transcribed(self, video_id: str, transcript_path: str) -> None:
-        """Record the call."""
-        self.mark_transcribed_calls.append({
-            "video_id": video_id,
-            "transcript_path": transcript_path,
-        })
-        if self.should_raise_error:
-            raise ValueError("Repository error")
-
-
 @pytest.fixture
 def audio_bytes() -> bytes:
     return b"fake audio content"
@@ -87,14 +53,7 @@ def fake_publisher() -> FakeTranscriptEventPublisher:
 
 
 @pytest.fixture
-def fake_storage(audio_bytes: bytes) -> FakeStorageClient:
-    client = FakeStorageClient()
-    client.set_download_response(audio_bytes)
-    return client
-
-
-@pytest.fixture
-def fake_videos_repository() -> FakeVideosRepository:
-    """Fixture for FakeVideosRepository."""
-    return FakeVideosRepository()
-
+def fake_storage(fake_storage_client, audio_bytes: bytes):
+    """Configured FakeStorageClient with audio_bytes pre-loaded."""
+    fake_storage_client.set_download_response(audio_bytes)
+    return fake_storage_client

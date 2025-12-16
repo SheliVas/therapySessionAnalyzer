@@ -11,7 +11,6 @@ from src.transcription_service.rabbitmq_consumer import (
 from tests.transcription_service.conftest import (
     FakeTranscriptionBackend,
     FakeTranscriptEventPublisher,
-    FakeStorageClient,
 )
 
 
@@ -71,7 +70,7 @@ def mock_pika(mocker, mock_connection):
 @pytest.fixture
 def started_consumer(
     config: RabbitMQConsumerConfig,
-    fake_storage: FakeStorageClient,
+    fake_storage,
     fake_backend: FakeTranscriptionBackend,
     fake_videos_repository,
     fake_publisher: FakeTranscriptEventPublisher,
@@ -102,7 +101,7 @@ def started_consumer(
 @pytest.mark.unit
 def test_should_connect_with_correct_parameters(
     config: RabbitMQConsumerConfig,
-    fake_storage: FakeStorageClient,
+    fake_storage,
     fake_backend: FakeTranscriptionBackend,
     fake_videos_repository,
     fake_publisher: FakeTranscriptEventPublisher,
@@ -135,7 +134,7 @@ def test_should_connect_with_correct_parameters(
 @pytest.mark.unit
 def test_should_declare_queue_durable(
     config: RabbitMQConsumerConfig,
-    fake_storage: FakeStorageClient,
+    fake_storage,
     fake_backend: FakeTranscriptionBackend,
     fake_videos_repository,
     fake_publisher: FakeTranscriptEventPublisher,
@@ -167,7 +166,7 @@ def test_should_declare_queue_durable(
 def test_should_process_message_and_upload_transcript(
     started_consumer: tuple,
     fake_backend: FakeTranscriptionBackend,
-    fake_storage: FakeStorageClient,
+    fake_storage,
     message_body: bytes,
     video_id: str,
     mocker,
@@ -256,7 +255,7 @@ def test_should_acknowledge_message_after_processing(
 ])
 def test_should_handle_malformed_message_gracefully(
     config: RabbitMQConsumerConfig,
-    fake_storage: FakeStorageClient,
+    fake_storage,
     fake_backend: FakeTranscriptionBackend,
     fake_videos_repository,
     fake_publisher: FakeTranscriptEventPublisher,

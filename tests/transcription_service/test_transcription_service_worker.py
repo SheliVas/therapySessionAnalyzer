@@ -5,7 +5,6 @@ from src.transcription_service.worker import process_audio_extracted_event
 from tests.transcription_service.conftest import (
     FakeTranscriptionBackend,
     FakeTranscriptEventPublisher,
-    FakeStorageClient,
 )
 
 
@@ -17,7 +16,7 @@ def test_should_call_backend_transcribe_once_with_downloaded_bytes(
     event: AudioExtractedEvent,
     fake_backend: FakeTranscriptionBackend,
     fake_publisher: FakeTranscriptEventPublisher,
-    fake_storage: FakeStorageClient,
+    fake_storage,
     fake_videos_repository,
     audio_bytes: bytes,
 ) -> None:
@@ -32,7 +31,7 @@ def test_should_return_transcript_created_event_with_correct_video_id(
     event: AudioExtractedEvent,
     fake_backend: FakeTranscriptionBackend,
     fake_publisher: FakeTranscriptEventPublisher,
-    fake_storage: FakeStorageClient,
+    fake_storage,
     fake_videos_repository,
 ) -> None:
     result = process_audio_extracted_event(event, fake_storage, fake_backend, fake_videos_repository, fake_publisher)
@@ -45,7 +44,7 @@ def test_should_upload_transcript_to_storage(
     event: AudioExtractedEvent,
     fake_backend: FakeTranscriptionBackend,
     fake_publisher: FakeTranscriptEventPublisher,
-    fake_storage: FakeStorageClient,
+    fake_storage,
     fake_videos_repository,
 ) -> None:
     process_audio_extracted_event(event, fake_storage, fake_backend, fake_videos_repository, fake_publisher)
@@ -60,7 +59,7 @@ def test_should_publish_exactly_one_event_equal_to_returned_event(
     event: AudioExtractedEvent,
     fake_backend: FakeTranscriptionBackend,
     fake_publisher: FakeTranscriptEventPublisher,
-    fake_storage: FakeStorageClient,
+    fake_storage,
     fake_videos_repository,
 ) -> None:
     result = process_audio_extracted_event(event, fake_storage, fake_backend, fake_videos_repository, fake_publisher)

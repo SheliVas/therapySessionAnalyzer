@@ -11,10 +11,9 @@ from src.audio_extractor_service.rabbitmq_consumer import (
 )
 from tests.audio_extractor_service.conftest import (
     FakeAudioEventPublisher,
-    FakeStorageClient,
     FakeAudioConverter,
-    FakeVideosRepository,
 )
+
 
 
 # --- Fixtures ---
@@ -77,10 +76,10 @@ def mock_connection_with_callback(mocker, mock_channel_with_callback):
 @pytest.fixture
 def started_consumer(
     config: RabbitMQConsumerConfig,
-    fake_storage_client: FakeStorageClient,
+    fake_storage_client,
     fake_audio_converter: FakeAudioConverter,
     fake_publisher: FakeAudioEventPublisher,
-    fake_videos_repository: FakeVideosRepository,
+    fake_videos_repository,
     video_bytes: bytes,
     audio_bytes: bytes,
     mock_channel_with_callback,
@@ -116,10 +115,10 @@ def started_consumer(
 @pytest.mark.unit
 def test_should_connect_with_correct_parameters(
     config: RabbitMQConsumerConfig,
-    fake_storage_client: FakeStorageClient,
+    fake_storage_client,
     fake_audio_converter: FakeAudioConverter,
     fake_publisher: FakeAudioEventPublisher,
-    fake_videos_repository: FakeVideosRepository,
+    fake_videos_repository,
     mocker,
     mock_connection,
     mock_channel,
@@ -152,10 +151,10 @@ def test_should_connect_with_correct_parameters(
 @pytest.mark.unit
 def test_should_declare_queue_durable(
     config: RabbitMQConsumerConfig,
-    fake_storage_client: FakeStorageClient,
+    fake_storage_client,
     fake_audio_converter: FakeAudioConverter,
     fake_publisher: FakeAudioEventPublisher,
-    fake_videos_repository: FakeVideosRepository,
+    fake_videos_repository,
     mocker,
     mock_connection,
     mock_channel,
@@ -231,10 +230,10 @@ def test_should_acknowledge_message_after_processing(
 ])
 def test_should_handle_malformed_message_gracefully(
     config: RabbitMQConsumerConfig,
-    fake_storage_client: FakeStorageClient,
+    fake_storage_client,
     fake_audio_converter: FakeAudioConverter,
     fake_publisher: FakeAudioEventPublisher,
-    fake_videos_repository: FakeVideosRepository,
+    fake_videos_repository,
     mocker,
     mock_connection,
     mock_channel,
