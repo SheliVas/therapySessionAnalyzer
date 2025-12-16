@@ -2,8 +2,9 @@ import pytest
 from fastapi.testclient import TestClient
 
 from src.upload_service.app import create_app
-from src.upload_service.domain import VideoUploadedEvent, VideoEventPublisher
+from src.upload_service.domain import VideoUploadedEvent, VideoEventPublisher, VideosRepository
 from src.upload_service.storage import StorageClient
+from datetime import datetime
 
 
 class FakeStorageClient(StorageClient):
@@ -28,6 +29,26 @@ class FakeVideoEventPublisher(VideoEventPublisher):
         self.published_events.append(event)
 
 
+class FakeVideosRepository(VideosRepository):
+    """Fake repository for testing."""
+    def __init__(self):
+        self.videos = []
+
+    def upsert_on_upload(
+        self,
+        video_id: str,
+        filename: str,
+        storage_path: str,
+        uploaded_at: datetime,
+    ) -> None:
+        self.videos.append({
+            "video_id": video_id,
+            "filename": filename,
+            "storage_path": storage_path,
+            "uploaded_at": uploaded_at,
+        })
+
+
 @pytest.fixture
 def fake_storage() -> FakeStorageClient:
     """Fake storage client for testing."""
@@ -41,9 +62,23 @@ def fake_publisher() -> FakeVideoEventPublisher:
 
 
 @pytest.fixture
-def client(fake_storage: FakeStorageClient, fake_publisher: FakeVideoEventPublisher) -> TestClient:
+def fake_repository() -> FakeVideosRepository:
+    """Fake repository for testing."""
+    return FakeVideosRepository()
+
+
+@pytest.fixture
+def client(
+    fake_storage: FakeStorageClient,
+    fake_publisher: FakeVideoEventPublisher,
+    fake_repository: FakeVideosRepository,
+) -> TestClient:
     """Create FastAPI test client with injected fake dependencies."""
-    app = create_app(storage_client=fake_storage, publisher=fake_publisher)
+    app = create_app(
+        storage_client=fake_storage,
+        publisher=fake_publisher,
+        repository=fake_repository,
+    )
     return TestClient(app)
 
 

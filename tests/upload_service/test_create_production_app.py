@@ -1,137 +1,120 @@
 import pytest
-
 from src.upload_service.app import create_production_app
 from src.upload_service.storage import StorageClient
-from src.upload_service.domain import VideoEventPublisher
+from src.upload_service.domain import VideoEventPublisher, VideosRepository
 
+# --- Fixtures ---
+
+@pytest.fixture
+def mock_dependencies(mocker):
+    """Mock all external dependencies for create_production_app."""
+    mocks = {}
+    
+    # Config mocks
+    mocks["minio_config"] = mocker.patch("src.upload_service.app.get_minio_config")
+    mocks["rabbitmq_config"] = mocker.patch("src.upload_service.app.get_rabbitmq_config")
+    mocks["mongo_config"] = mocker.patch("src.upload_service.app.get_mongo_config")
+    
+    # Service mocks
+    mocks["minio_storage"] = mocker.patch("src.upload_service.app.MinioStorage")
+    mocks["rabbitmq_publisher"] = mocker.patch("src.upload_service.app.RabbitMQVideoEventPublisher")
+    mocks["mongo_repo"] = mocker.patch("src.upload_service.app.MongoVideosRepository")
+    
+    # External lib mocks
+    mocks["mongo_client"] = mocker.patch("src.upload_service.app.MongoClient")
+    
+    # App mock
+    mocks["create_app"] = mocker.patch("src.upload_service.app.create_app")
+    
+    return mocks
 
 # --- Unit Tests ---
 
 @pytest.mark.unit
-def test_should_pass_storage_and_publisher_to_create_app(mocker):
-    """Verify create_production_app passes storage and publisher to create_app."""
-    mock_minio_storage_class = mocker.patch("src.upload_service.app.MinioStorage")
-    mock_rabbitmq_publisher_class = mocker.patch(
-        "src.upload_service.app.RabbitMQVideoEventPublisher"
-    )
-    mock_create_app = mocker.patch("src.upload_service.app.create_app")
-    mocker.patch("src.upload_service.app.get_minio_config")
-    mocker.patch("src.upload_service.app.get_rabbitmq_config")
-    
-    mock_storage_instance = mocker.MagicMock(spec=StorageClient)
-    mock_publisher_instance = mocker.MagicMock(spec=VideoEventPublisher)
-    
-    mock_minio_storage_class.return_value = mock_storage_instance
-    mock_rabbitmq_publisher_class.return_value = mock_publisher_instance
-    mock_create_app.return_value = mocker.MagicMock()
+def test_should_pass_all_dependencies_to_create_app(mock_dependencies):
+    """Verify create_production_app passes all dependencies to create_app."""
+
+    storage_instance = mock_dependencies["minio_storage"].return_value
+    publisher_instance = mock_dependencies["rabbitmq_publisher"].return_value
+    repo_instance = mock_dependencies["mongo_repo"].return_value
     
     create_production_app()
     
-    mock_create_app.assert_called_once_with(
-        storage_client=mock_storage_instance,
-        publisher=mock_publisher_instance,
+    mock_dependencies["create_app"].assert_called_once_with(
+        storage_client=storage_instance,
+        publisher=publisher_instance,
+        repository=repo_instance,
     )
 
 @pytest.mark.unit
-def test_should_call_get_minio_config(mocker):
-    """Verify create_production_app calls get_minio_config to fetch MinIO settings."""
-    mock_get_minio_config = mocker.patch("src.upload_service.app.get_minio_config")
-    mocker.patch("src.upload_service.app.MinioStorage")
-    mocker.patch("src.upload_service.app.RabbitMQVideoEventPublisher")
-    mocker.patch("src.upload_service.app.get_rabbitmq_config")
-    mocker.patch("src.upload_service.app.create_app")
+def test_should_initialize_minio_correctly(mock_dependencies):
+    """Verify MinioStorage is initialized with config."""
+    config = mock_dependencies["minio_config"].return_value
     
     create_production_app()
     
-    mock_get_minio_config.assert_called_once()
-
+    mock_dependencies["minio_storage"].assert_called_once_with(config)
 
 @pytest.mark.unit
-def test_should_call_get_rabbitmq_config(mocker):
-    """Verify create_production_app calls get_rabbitmq_config to fetch RabbitMQ settings."""
-    mock_get_rabbitmq_config = mocker.patch("src.upload_service.app.get_rabbitmq_config")
-    mocker.patch("src.upload_service.app.MinioStorage")
-    mocker.patch("src.upload_service.app.RabbitMQVideoEventPublisher")
-    mocker.patch("src.upload_service.app.get_minio_config")
-    mocker.patch("src.upload_service.app.create_app")
+def test_should_initialize_rabbitmq_publisher_correctly(mock_dependencies):
+    """Verify RabbitMQVideoEventPublisher is initialized with config."""
+    config = mock_dependencies["rabbitmq_config"].return_value
     
     create_production_app()
     
-    mock_get_rabbitmq_config.assert_called_once()
-
+    mock_dependencies["rabbitmq_publisher"].assert_called_once_with(config)
 
 @pytest.mark.unit
-def test_should_raise_error_when_minio_storage_init_fails(mocker):
-    """Verify create_production_app propagates error if MinioStorage initialization fails."""
-    mocker.patch("src.upload_service.app.get_minio_config")
-    mocker.patch("src.upload_service.app.get_rabbitmq_config")
-    mock_minio_storage_class = mocker.patch("src.upload_service.app.MinioStorage")
-    mock_minio_storage_class.side_effect = Exception("Cannot connect to MinIO")
+def test_should_initialize_mongo_repository_correctly(mock_dependencies):
+    """Verify MongoVideosRepository is initialized with client and db_name."""
+    config = mock_dependencies["mongo_config"].return_value
+    client = mock_dependencies["mongo_client"].return_value
     
-    with pytest.raises(Exception, match="Cannot connect to MinIO"):
-        create_production_app()
-
-
-@pytest.mark.unit
-def test_should_raise_error_when_rabbitmq_publisher_init_fails(mocker):
-    """Verify create_production_app propagates error if RabbitMQVideoEventPublisher init fails."""
-    mocker.patch("src.upload_service.app.get_minio_config")
-    mocker.patch("src.upload_service.app.get_rabbitmq_config")
-    mocker.patch("src.upload_service.app.MinioStorage")
-    mock_rabbitmq_publisher_class = mocker.patch("src.upload_service.app.RabbitMQVideoEventPublisher")
-    mock_rabbitmq_publisher_class.side_effect = Exception("RabbitMQ connection refused")
+    create_production_app()
     
-    with pytest.raises(Exception, match="RabbitMQ connection refused"):
-        create_production_app()
-
+    mock_dependencies["mongo_client"].assert_called_once_with(config.uri)
+    mock_dependencies["mongo_repo"].assert_called_once_with(client, config.db_name)
 
 @pytest.mark.unit
-def test_should_return_fastapi_app_instance(mocker):
-    """Verify create_production_app returns a FastAPI app instance."""
-    mocker.patch("src.upload_service.app.get_minio_config")
-    mocker.patch("src.upload_service.app.get_rabbitmq_config")
-    mocker.patch("src.upload_service.app.MinioStorage")
-    mocker.patch("src.upload_service.app.RabbitMQVideoEventPublisher")
-    mock_create_app = mocker.patch("src.upload_service.app.create_app")
-    mock_app_instance = mocker.MagicMock()
-    mock_create_app.return_value = mock_app_instance
+def test_should_return_fastapi_app_instance(mock_dependencies):
+    """Verify create_production_app returns the app instance."""
+    expected_app = mock_dependencies["create_app"].return_value
     
     result = create_production_app()
     
-    assert result is mock_app_instance
+    assert result is expected_app
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "mock_key, error_message",
+    [
+        ("minio_config", "MinIO Config Error"),
+        ("rabbitmq_config", "RabbitMQ Config Error"),
+        ("mongo_config", "Mongo Config Error"),
+        ("minio_storage", "MinIO Init Error"),
+        ("rabbitmq_publisher", "Publisher Init Error"),
+        ("mongo_client", "Mongo Client Error"),
+        ("mongo_repo", "Repo Init Error"),
+    ],
+)
+def test_should_raise_error_when_dependency_initialization_fails(
+    mock_dependencies, mock_key, error_message
+):
+    """Verify create_production_app propagates errors from all dependencies."""
+    mock_dependencies[mock_key].side_effect = Exception(error_message)
+    
+    with pytest.raises(Exception, match=error_message):
+        create_production_app()
 
 
 @pytest.mark.unit
-def test_should_initialize_minio_with_config_object(mocker):
-    """Verify create_production_app passes config object to MinioStorage constructor."""
-    mock_config = mocker.MagicMock()
-    mock_get_minio_config = mocker.patch(
-        "src.upload_service.app.get_minio_config",
-        return_value=mock_config
-    )
-    mock_minio_storage_class = mocker.patch("src.upload_service.app.MinioStorage")
-    mocker.patch("src.upload_service.app.RabbitMQVideoEventPublisher")
-    mocker.patch("src.upload_service.app.get_rabbitmq_config")
-    mocker.patch("src.upload_service.app.create_app")
+def test_should_create_distinct_instances_for_each_call(mock_dependencies):
+    """Verify create_production_app creates distinct instances on each call."""
+    mock_dependencies["mongo_client"].side_effect = [object(), object()]
+    mock_dependencies["mongo_repo"].side_effect = [object(), object()]
     
     create_production_app()
-    
-    mock_minio_storage_class.assert_called_once_with(mock_config)
-
-
-@pytest.mark.unit
-def test_should_initialize_rabbitmq_publisher_with_config_object(mocker):
-    """Verify create_production_app passes config object to RabbitMQVideoEventPublisher."""
-    mock_config = mocker.MagicMock()
-    mock_get_rabbitmq_config = mocker.patch(
-        "src.upload_service.app.get_rabbitmq_config",
-        return_value=mock_config
-    )
-    mocker.patch("src.upload_service.app.MinioStorage")
-    mock_rabbitmq_publisher_class = mocker.patch("src.upload_service.app.RabbitMQVideoEventPublisher")
-    mocker.patch("src.upload_service.app.get_minio_config")
-    mocker.patch("src.upload_service.app.create_app")
-    
     create_production_app()
     
-    mock_rabbitmq_publisher_class.assert_called_once_with(mock_config)
+    assert mock_dependencies["mongo_client"].call_count == 2
+    assert mock_dependencies["mongo_repo"].call_count == 2

@@ -2,12 +2,14 @@ from fastapi import FastAPI, UploadFile, File, status, HTTPException
 from pydantic import BaseModel
 from datetime import datetime
 from pathlib import Path
+from pymongo import MongoClient
 
-from src.upload_service.domain import VideoEventPublisher, handle_video_upload
-from src.upload_service.config import get_rabbitmq_config, get_minio_config
+from src.upload_service.domain import VideoEventPublisher, VideosRepository, handle_video_upload
+from src.upload_service.config import get_rabbitmq_config, get_minio_config, get_mongo_config
 from src.upload_service.storage import StorageClient
 from src.upload_service.rabbitmq_publisher import RabbitMQVideoEventPublisher
 from src.shared.minio_storage import MinioStorage
+from src.shared.videos_repository import MongoVideosRepository
 
 
 class VideoUploadResponse(BaseModel):
@@ -18,12 +20,22 @@ class VideoUploadResponse(BaseModel):
 def create_production_app() -> FastAPI:
     storage_client = MinioStorage(get_minio_config())
     publisher = RabbitMQVideoEventPublisher(get_rabbitmq_config())
-    return create_app(storage_client=storage_client, publisher=publisher)
+    
+    mongo_config = get_mongo_config()
+    mongo_client = MongoClient(mongo_config.uri)
+    repository = MongoVideosRepository(mongo_client, mongo_config.db_name)
+    
+    return create_app(
+        storage_client=storage_client,
+        publisher=publisher,
+        repository=repository,
+    )
 
 
 def create_app(
     storage_client: StorageClient,
     publisher: VideoEventPublisher,
+    repository: VideosRepository,
 ) -> FastAPI:
     app = FastAPI(title="Upload Service")
 
@@ -44,6 +56,7 @@ def create_app(
             video_id = handle_video_upload(
                 storage_client=storage_client,
                 publisher=publisher,
+                repository=repository,
                 filename=file.filename,
                 content=content,
             )

@@ -5,6 +5,13 @@ from src.upload_service.rabbitmq_publisher import RabbitMQConfig
 
 
 @dataclass
+class MongoConfig:
+    """Configuration for MongoDB connection."""
+    uri: str
+    db_name: str = "therapy_analysis"
+
+
+@dataclass
 class MinIOConfig:
     """Configuration for MinIO storage client."""
     endpoint: str
@@ -43,4 +50,14 @@ def get_minio_config() -> MinIOConfig:
         secret_key=secret_key,
         bucket=bucket,
         secure=secure,
+    )
+
+
+def get_mongo_config() -> MongoConfig:
+    uri = os.getenv("MONGO_URI", "mongodb://localhost:27017")
+    db_name = os.getenv("MONGO_DB_NAME", "therapy_analysis")
+    
+    return MongoConfig(
+        uri=uri,
+        db_name=db_name,
     )

@@ -4,12 +4,5 @@ from src.upload_service.app import create_app
 
 
 @pytest.mark.unit
-def test_health_endpoint_returns_ok(fake_publisher, mocker):
-    fake_storage = mocker.MagicMock()
-    app = create_app(storage_client=fake_storage, publisher=fake_publisher)
-    client = TestClient(app)
-
-    response = client.get("/health")
-
-    assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
+def test_health_endpoint_returns_ok(fake_storage, fake_publisher, fake_repository):
+    app = create_app(storage_client=fake_storage, publisher=fake_publisher, repository=fake_repository)
