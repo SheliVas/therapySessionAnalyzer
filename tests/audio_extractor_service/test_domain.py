@@ -260,3 +260,59 @@ def test_handler_should_call_domain_function_with_repository(
     
     assert len(fake_videos_repository.mark_audio_extracted_calls) == 1
     assert len(fake_audio_publisher.published_events) == 1
+
+
+@pytest.mark.unit
+def test_should_call_repository_mark_audio_extracted_with_correct_path(
+    fake_storage_client,
+    fake_audio_converter,
+    fake_videos_repository,
+    video_id: str,
+    video_bytes: bytes,
+    audio_bytes: bytes,
+):
+    """extract_audio_from_video_event should call repository with correct audio_path."""
+    event = _create_video_uploaded_event(video_id)
+    fake_storage_client.set_download_response(video_bytes)
+    fake_audio_converter.set_convert_response(audio_bytes)
+    
+    extract_audio_from_video_event(
+        event=event,
+        storage_client=fake_storage_client,
+        audio_converter=fake_audio_converter,
+        repository=fake_videos_repository,
+    )
+    
+    assert len(fake_videos_repository.mark_audio_extracted_calls) == 1
+    call = fake_videos_repository.mark_audio_extracted_calls[0]
+    assert call["video_id"] == video_id
+    assert "therapy-audio" in call["audio_path"]
+    assert "audio.mp3" in call["audio_path"]
+
+
+@pytest.mark.unit
+def test_should_not_publish_on_repository_failure(
+    fake_storage_client,
+    fake_audio_converter,
+    fake_audio_publisher,
+    fake_videos_repository,
+    video_id: str,
+    video_bytes: bytes,
+    audio_bytes: bytes,
+):
+    """Handler should not publish if repository.mark_audio_extracted fails."""
+    event = _create_video_uploaded_event(video_id)
+    fake_storage_client.set_download_response(video_bytes)
+    fake_audio_converter.set_convert_response(audio_bytes)
+    fake_videos_repository.should_raise_error = True
+    
+    with pytest.raises(ValueError, match="Repository error"):
+        handle_audio_extraction_event(
+            event=event,
+            storage_client=fake_storage_client,
+            audio_converter=fake_audio_converter,
+            repository=fake_videos_repository,
+            publisher=fake_audio_publisher,
+        )
+    
+    assert len(fake_audio_publisher.published_events) == 0

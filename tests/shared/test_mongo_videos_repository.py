@@ -124,3 +124,50 @@ def test_should_raise_error_when_marking_nonexistent_video_as_analyzed(
 ) -> None:
     with pytest.raises(VideoNotFoundError):
         repository.mark_analyzed(video_id="missing-video", word_count=999)
+
+
+@pytest.mark.unit
+def test_should_update_status_and_audio_path_when_marking_audio_extracted(
+    repository, mongo_client, uploaded_video
+) -> None:
+    repository.mark_audio_extracted(video_id="video-1", audio_path="therapy-audio/audio/video-1/audio.mp3")
+    
+    collection = mongo_client["therapy_analysis"]["videos"]
+    doc = collection.find_one({"video_id": "video-1"})
+    
+    assert doc["status"] == "audio_extracted"
+    assert doc["audio_path"] == "therapy-audio/audio/video-1/audio.mp3"
+
+
+@pytest.mark.unit
+def test_should_preserve_existing_fields_when_marking_audio_extracted(
+    repository, mongo_client, uploaded_video
+) -> None:
+    repository.mark_audio_extracted(video_id="video-1", audio_path="therapy-audio/audio/video-1/audio.mp3")
+    
+    collection = mongo_client["therapy_analysis"]["videos"]
+    doc = collection.find_one({"video_id": "video-1"})
+    
+    assert doc["filename"] == "session1.mp4"
+    assert doc["storage_path"] == "/data/uploads/video-1/session1.mp4"
+    assert doc["video_id"] == "video-1"
+
+
+@pytest.mark.unit
+def test_should_raise_error_when_marking_nonexistent_video_as_audio_extracted(
+    repository, mongo_client
+) -> None:
+    with pytest.raises(VideoNotFoundError):
+        repository.mark_audio_extracted(video_id="missing-video", audio_path="therapy-audio/audio/missing-video/audio.mp3")
+
+
+@pytest.mark.unit
+def test_should_not_create_duplicate_when_marking_audio_extracted(
+    repository, mongo_client, uploaded_video
+) -> None:
+    repository.mark_audio_extracted(video_id="video-1", audio_path="therapy-audio/audio/video-1/audio.mp3")
+    
+    collection = mongo_client["therapy_analysis"]["videos"]
+    documents = list(collection.find({"video_id": "video-1"}))
+    
+    assert len(documents) == 1
