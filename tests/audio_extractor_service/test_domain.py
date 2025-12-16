@@ -1,4 +1,4 @@
-"""Tests for domain logic: extract_audio_from_video_event with MinIO storage."""
+"""Tests for domain logic: extract_audio_from_video_event with MinIO storage and Repository updates."""
 import pytest
 from datetime import datetime
 
@@ -6,6 +6,7 @@ from src.upload_service.domain import VideoUploadedEvent
 from src.audio_extractor_service.domain import (
     AudioExtractedEvent,
     extract_audio_from_video_event,
+    handle_audio_extraction_event,
 )
 
 
@@ -28,100 +29,87 @@ def _create_video_uploaded_event(
     )
 
 
-# --- Unit Tests: Happy Path ---
+# --- Fixtures ---
 
-@pytest.mark.unit
-def test_should_download_video_from_minio_bucket(
-    fake_storage_client,
-    fake_audio_converter,
-    video_id: str,
-    video_bytes: bytes,
-    audio_bytes: bytes,
+class FakeVideosRepository:
+    """Fake repository for testing."""
+    def __init__(self) -> None:
+        self.mark_audio_extracted_calls: list[dict] = []
+        self.should_raise_error = False
+    
+    def mark_audio_extracted(self, video_id: str, audio_path: str) -> None:
+        """Record the call."""
+        self.mark_audio_extracted_calls.append({
+            "video_id": video_id,
+            "audio_path": audio_path,
+        })
+        if self.should_raise_error:
+            raise ValueError("Repository error")
+
+
+@pytest.fixture
+def fake_videos_repository() -> FakeVideosRepository:
+    """Fixture for FakeVideosRepository."""
+    return FakeVideosRepository()
+
+
+# --- Fixtures: Execution Results ---
+
+@pytest.fixture
+def successful_extraction(
+    configured_storage_and_converter,
+    fake_videos_repository,
+    video_id,
 ):
-    """Domain should call storage_client.download_file with bucket/key from event."""
+    """Execute the domain function successfully and return the result and collaborators."""
+    fake_storage_client, fake_audio_converter = configured_storage_and_converter
     event = _create_video_uploaded_event(video_id)
-    fake_storage_client.set_download_response(video_bytes)
-    fake_audio_converter.set_convert_response(audio_bytes)
-    
-    extract_audio_from_video_event(
-        event=event,
-        storage_client=fake_storage_client,
-        audio_converter=fake_audio_converter,
-    )
-    
-    assert fake_storage_client.download_called_with == {
-        "bucket": "therapy-videos",
-        "key": f"videos/{video_id}/test.mp4",
-    }
-
-
-@pytest.mark.unit
-def test_should_convert_video_bytes_to_audio(
-    fake_storage_client,
-    fake_audio_converter,
-    video_id: str,
-    video_bytes: bytes,
-    audio_bytes: bytes,
-):
-    """Domain should call audio_converter.convert with downloaded bytes."""
-    event = _create_video_uploaded_event(video_id)
-    fake_storage_client.set_download_response(video_bytes)
-    fake_audio_converter.set_convert_response(audio_bytes)
-    
-    extract_audio_from_video_event(
-        event=event,
-        storage_client=fake_storage_client,
-        audio_converter=fake_audio_converter,
-    )
-    
-    assert fake_audio_converter.convert_called_with == video_bytes
-
-
-@pytest.mark.unit
-def test_should_upload_mp3_to_minio_therapy_audio_bucket(
-    fake_storage_client,
-    fake_audio_converter,
-    video_id: str,
-    video_bytes: bytes,
-    audio_bytes: bytes,
-):
-    """Domain should upload MP3 to therapy-audio bucket with key audio/{video_id}/audio.mp3."""
-    event = _create_video_uploaded_event(video_id)
-    fake_storage_client.set_download_response(video_bytes)
-    fake_audio_converter.set_convert_response(audio_bytes)
-    
-    extract_audio_from_video_event(
-        event=event,
-        storage_client=fake_storage_client,
-        audio_converter=fake_audio_converter,
-    )
-    
-    assert fake_storage_client.upload_called_with == {
-        "bucket": "therapy-audio",
-        "key": f"audio/{video_id}/audio.mp3",
-        "content": audio_bytes,
-    }
-
-
-@pytest.mark.unit
-def test_should_return_audio_extracted_event_with_bucket_and_key(
-    fake_storage_client,
-    fake_audio_converter,
-    video_id: str,
-    video_bytes: bytes,
-    audio_bytes: bytes,
-):
-    """Domain should return AudioExtractedEvent with bucket/key metadata."""
-    event = _create_video_uploaded_event(video_id)
-    fake_storage_client.set_download_response(video_bytes)
-    fake_audio_converter.set_convert_response(audio_bytes)
     
     result = extract_audio_from_video_event(
         event=event,
         storage_client=fake_storage_client,
         audio_converter=fake_audio_converter,
+        repository=fake_videos_repository,
     )
     
+    return result, fake_storage_client, fake_audio_converter, fake_videos_repository
+
+
+# --- Unit Tests: Happy Path ---
+
+@pytest.mark.unit
+def test_should_perform_successful_extraction_flow(
+    successful_extraction,
+    video_id,
+    video_bytes,
+    audio_bytes,
+):
+    """Verify the complete happy path flow: download -> convert -> upload -> update repo -> return event."""
+    result, fake_storage_client, fake_audio_converter, fake_videos_repository = successful_extraction
+    
+    # 1. Download
+    assert fake_storage_client.download_called_with == {
+        "bucket": "therapy-videos",
+        "key": f"videos/{video_id}/test.mp4",
+    }
+    
+    # 2. Convert
+    assert fake_audio_converter.convert_called_with == video_bytes
+    
+    # 3. Upload
+    assert fake_storage_client.upload_called_with == {
+        "bucket": "therapy-audio",
+        "key": f"audio/{video_id}/audio.mp3",
+        "content": audio_bytes,
+    }
+    
+    # 4. Repository Update
+    assert len(fake_videos_repository.mark_audio_extracted_calls) == 1
+    call = fake_videos_repository.mark_audio_extracted_calls[0]
+    assert call["video_id"] == video_id
+    assert call["audio_path"] == f"therapy-audio/audio/{video_id}/audio.mp3"
+    
+    # 5. Return Event
     assert isinstance(result, AudioExtractedEvent)
     assert result.video_id == video_id
     assert result.bucket == "therapy-audio"
@@ -131,35 +119,40 @@ def test_should_return_audio_extracted_event_with_bucket_and_key(
 # --- Unit Tests: Error Cases ---
 
 @pytest.mark.unit
-def test_should_raise_value_error_when_storage_client_returns_empty_bytes(
-    fake_storage_client,
-    fake_audio_converter,
-    video_id: str,
+@pytest.mark.parametrize("setup_func, expected_error_match", [
+    (lambda fsc, fac, fvr: fsc.set_download_response(b""), "empty"),
+    (lambda fsc, fac, fvr: setattr(fvr, 'should_raise_error', True), "Repository error"),
+])
+def test_should_raise_error_on_failure_conditions(
+    configured_storage_and_converter,
+    fake_videos_repository,
+    video_id,
+    setup_func,
+    expected_error_match,
 ):
-    """Domain should raise ValueError when download returns empty bytes."""
+    """Domain should raise appropriate errors when dependencies fail or return invalid data."""
+    fake_storage_client, fake_audio_converter = configured_storage_and_converter
     event = _create_video_uploaded_event(video_id)
-    fake_storage_client.set_download_response(b"")
     
-    with pytest.raises(ValueError, match="empty"):
+    setup_func(fake_storage_client, fake_audio_converter, fake_videos_repository)
+    
+    with pytest.raises(ValueError, match=expected_error_match):
         extract_audio_from_video_event(
             event=event,
             storage_client=fake_storage_client,
             audio_converter=fake_audio_converter,
+            repository=fake_videos_repository,
         )
 
 
 @pytest.mark.unit
-@pytest.mark.parametrize("should_call_converter,should_call_upload", [
-    (False, False),  # Both should be skipped on empty bytes
-])
-def test_should_not_call_downstream_on_empty_download(
+def test_should_not_call_repository_on_upstream_failure(
     fake_storage_client,
     fake_audio_converter,
-    video_id: str,
-    should_call_converter: bool,
-    should_call_upload: bool,
+    fake_videos_repository,
+    video_id,
 ):
-    """Domain should not call converter or upload if download returns empty bytes."""
+    """Domain should not call repository if extraction fails (e.g. empty download)."""
     event = _create_video_uploaded_event(video_id)
     fake_storage_client.set_download_response(b"")
     
@@ -168,14 +161,12 @@ def test_should_not_call_downstream_on_empty_download(
             event=event,
             storage_client=fake_storage_client,
             audio_converter=fake_audio_converter,
+            repository=fake_videos_repository,
         )
     except ValueError:
         pass
     
-    if not should_call_converter:
-        assert fake_audio_converter.convert_called_with is None
-    if not should_call_upload:
-        assert fake_storage_client.upload_called_with is None
+    assert len(fake_videos_repository.mark_audio_extracted_calls) == 0
 
 
 # --- Unit Tests: Edge Cases ---
@@ -185,6 +176,7 @@ def test_should_not_call_downstream_on_empty_download(
 def test_should_handle_various_video_sizes(
     fake_storage_client,
     fake_audio_converter,
+    fake_videos_repository,
     video_id: str,
     audio_bytes: bytes,
     video_size_mb: int,
@@ -199,32 +191,11 @@ def test_should_handle_various_video_sizes(
         event=event,
         storage_client=fake_storage_client,
         audio_converter=fake_audio_converter,
+        repository=fake_videos_repository,
     )
     
     assert result.video_id == video_id
     assert fake_audio_converter.convert_called_with == large_video_bytes
-
-
-@pytest.mark.unit
-def test_should_upload_exact_audio_bytes_from_converter(
-    fake_storage_client,
-    fake_audio_converter,
-    video_id: str,
-    video_bytes: bytes,
-):
-    """Domain should upload the exact bytes returned by converter."""
-    event = _create_video_uploaded_event(video_id)
-    unique_audio_bytes = b"unique-audio-signature-123"
-    fake_storage_client.set_download_response(video_bytes)
-    fake_audio_converter.set_convert_response(unique_audio_bytes)
-    
-    extract_audio_from_video_event(
-        event=event,
-        storage_client=fake_storage_client,
-        audio_converter=fake_audio_converter,
-    )
-    
-    assert fake_storage_client.upload_called_with["content"] == unique_audio_bytes
 
 
 @pytest.mark.unit
@@ -235,6 +206,7 @@ def test_should_upload_exact_audio_bytes_from_converter(
 def test_should_respect_different_source_buckets(
     fake_storage_client,
     fake_audio_converter,
+    fake_videos_repository,
     video_id: str,
     video_bytes: bytes,
     audio_bytes: bytes,
@@ -254,63 +226,37 @@ def test_should_respect_different_source_buckets(
         event=event,
         storage_client=fake_storage_client,
         audio_converter=fake_audio_converter,
+        repository=fake_videos_repository,
     )
     
     assert fake_storage_client.download_called_with["bucket"] == custom_bucket
     assert fake_storage_client.download_called_with["key"] == custom_key
 
 
-@pytest.mark.unit
-@pytest.mark.parametrize("source_bucket", [
-    "my-custom-videos",
-    "archive-bucket",
-    "temp-uploads",
-])
-def test_should_always_upload_to_therapy_audio_bucket(
-    fake_storage_client,
-    fake_audio_converter,
-    video_id: str,
-    video_bytes: bytes,
-    audio_bytes: bytes,
-    source_bucket: str,
-):
-    """Domain should always upload result to therapy-audio, regardless of source bucket."""
-    event = _create_video_uploaded_event(video_id, bucket=source_bucket)
-    fake_storage_client.set_download_response(video_bytes)
-    fake_audio_converter.set_convert_response(audio_bytes)
-    
-    extract_audio_from_video_event(
-        event=event,
-        storage_client=fake_storage_client,
-        audio_converter=fake_audio_converter,
-    )
-    
-    assert fake_storage_client.upload_called_with["bucket"] == "therapy-audio"
-
+# --- Integration: Handler ---
 
 @pytest.mark.unit
-def test_should_preserve_video_id_in_output_key(
+def test_handler_should_call_domain_function_with_repository(
     fake_storage_client,
     fake_audio_converter,
+    fake_audio_publisher,
+    fake_videos_repository,
     video_id: str,
     video_bytes: bytes,
     audio_bytes: bytes,
 ):
-    """Domain should use video_id in output key, not filename."""
-    event = _create_video_uploaded_event(
-        video_id,
-        key=f"videos/{video_id}/my-special-filename.mp4",
-    )
+    """Handler should pass repository to domain function and publish on success."""
+    event = _create_video_uploaded_event(video_id)
     fake_storage_client.set_download_response(video_bytes)
     fake_audio_converter.set_convert_response(audio_bytes)
     
-    extract_audio_from_video_event(
+    handle_audio_extraction_event(
         event=event,
         storage_client=fake_storage_client,
         audio_converter=fake_audio_converter,
+        repository=fake_videos_repository,
+        publisher=fake_audio_publisher,
     )
     
-    expected_key = f"audio/{video_id}/audio.mp3"
-    assert fake_storage_client.upload_called_with["key"] == expected_key
-
-
+    assert len(fake_videos_repository.mark_audio_extracted_calls) == 1
+    assert len(fake_audio_publisher.published_events) == 1

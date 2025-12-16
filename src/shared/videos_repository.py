@@ -45,6 +45,17 @@ class MongoVideosRepository:
             upsert=True,
         )
     
+    def _update_status(self, video_id: str, updates: dict) -> None:
+        """Helper to update video status and raise error if not found."""
+        result = self._collection.update_one(
+            {"video_id": video_id},
+            {"$set": updates},
+            upsert=False,
+        )
+        
+        if result.matched_count == 0:
+            raise VideoNotFoundError(f"Video with id {video_id} not found")
+
     def mark_analyzed(
         self,
         video_id: str,
@@ -63,11 +74,25 @@ class MongoVideosRepository:
         if word_count is not None:
             update_data["word_count"] = word_count
         
-        result = self._collection.update_one(
-            {"video_id": video_id},
-            {"$set": update_data},
-            upsert=False,
-        )
+        self._update_status(video_id, update_data)
+    
+    def mark_audio_extracted(
+        self,
+        video_id: str,
+        audio_path: str,
+    ) -> None:
+        """Mark a video as having audio extracted and store the audio path.
         
-        if result.matched_count == 0:
-            raise VideoNotFoundError(f"Video with id {video_id} not found")
+        Args:
+            video_id: Unique video identifier.
+            audio_path: Path where the extracted audio is stored (bucket/key).
+            
+        Raises:
+            VideoNotFoundError: If the video does not exist.
+        """
+        update_data = {
+            "status": "audio_extracted",
+            "audio_path": audio_path,
+        }
+        
+        self._update_status(video_id, update_data)

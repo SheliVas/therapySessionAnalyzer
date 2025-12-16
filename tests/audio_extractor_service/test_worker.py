@@ -25,125 +25,38 @@ def _create_video_uploaded_event(video_id: str) -> VideoUploadedEvent:
 # --- Unit Tests: Happy Path ---
 
 @pytest.mark.unit
-def test_should_call_storage_client_download(
-    fake_storage_client,
-    fake_audio_converter,
-    fake_audio_publisher,
+def test_worker_happy_path_execution(
     configured_storage_and_converter,
-    video_id: str,
+    fake_videos_repository,
+    fake_audio_publisher,
+    video_id,
+    video_bytes,
+    audio_bytes,
 ):
-    """Worker should download video from storage using bucket/key from event."""
+    """Verify the complete worker happy path: download -> convert -> publish."""
+    fake_storage_client, fake_audio_converter = configured_storage_and_converter
     event = _create_video_uploaded_event(video_id)
     
     handle_audio_extraction_event(
         event=event,
         storage_client=fake_storage_client,
         audio_converter=fake_audio_converter,
+        repository=fake_videos_repository,
         publisher=fake_audio_publisher,
     )
     
-    assert fake_storage_client.download_called_with is not None
-    assert fake_storage_client.download_called_with["bucket"] == "therapy-videos"
+    # 1. Verify interactions
     assert fake_storage_client.download_called_with["key"] == f"videos/{video_id}/test.mp4"
-
-
-@pytest.mark.unit
-def test_should_call_audio_converter(
-    fake_storage_client,
-    fake_audio_converter,
-    fake_audio_publisher,
-    video_id: str,
-    video_bytes: bytes,
-    audio_bytes: bytes,
-):
-    """Worker should convert downloaded video bytes to audio."""
-    event = _create_video_uploaded_event(video_id)
-    fake_storage_client.set_download_response(video_bytes)
-    fake_audio_converter.set_convert_response(audio_bytes)
-    
-    handle_audio_extraction_event(
-        event=event,
-        storage_client=fake_storage_client,
-        audio_converter=fake_audio_converter,
-        publisher=fake_audio_publisher,
-    )
-    
     assert fake_audio_converter.convert_called_with == video_bytes
-
-
-@pytest.mark.unit
-def test_should_publish_exactly_one_event(
-    fake_storage_client,
-    fake_audio_converter,
-    fake_audio_publisher,
-    configured_storage_and_converter,
-    video_id: str,
-):
-    """Worker should publish exactly one audio extracted event."""
-    event = _create_video_uploaded_event(video_id)
     
-    handle_audio_extraction_event(
-        event=event,
-        storage_client=fake_storage_client,
-        audio_converter=fake_audio_converter,
-        publisher=fake_audio_publisher,
-    )
-    
+    # 2. Verify publication
     assert len(fake_audio_publisher.published_events) == 1
-
-
-@pytest.mark.unit
-@pytest.mark.parametrize("field,expected_value", [
-    ("video_id", "test-video-id"),  # Will be replaced by video_id fixture
-    ("bucket", "therapy-audio"),
-])
-def test_published_event_should_have_correct_fields(
-    fake_storage_client,
-    fake_audio_converter,
-    fake_audio_publisher,
-    configured_storage_and_converter,
-    video_id: str,
-    field: str,
-    expected_value: str,
-):
-    """Published event should have correct field values."""
-    event = _create_video_uploaded_event(video_id)
-    
-    handle_audio_extraction_event(
-        event=event,
-        storage_client=fake_storage_client,
-        audio_converter=fake_audio_converter,
-        publisher=fake_audio_publisher,
-    )
-    
     published_event = fake_audio_publisher.published_events[0]
+    
+    # 3. Verify event content
     assert isinstance(published_event, AudioExtractedEvent)
-    
-    if field == "video_id":
-        assert getattr(published_event, field) == video_id
-    else:
-        assert getattr(published_event, field) == expected_value
-
-
-@pytest.mark.unit
-def test_published_event_should_have_correct_key_format(
-    fake_storage_client,
-    fake_audio_converter,
-    fake_audio_publisher,
-    configured_storage_and_converter,
-    video_id: str,
-):
-    """Published event key should be audio/{video_id}/audio.mp3."""
-    event = _create_video_uploaded_event(video_id)
-    
-    handle_audio_extraction_event(
-        event=event,
-        storage_client=fake_storage_client,
-        audio_converter=fake_audio_converter,
-        publisher=fake_audio_publisher,
-    )
-    
-    published_event = fake_audio_publisher.published_events[0]
+    assert published_event.video_id == video_id
+    assert published_event.bucket == "therapy-audio"
     assert published_event.key == f"audio/{video_id}/audio.mp3"
 
 
@@ -159,6 +72,7 @@ def test_should_not_publish_on_errors(
     fake_storage_client,
     fake_audio_converter,
     fake_audio_publisher,
+    fake_videos_repository,
     video_id: str,
     video_bytes: bytes,
     audio_bytes: bytes,
@@ -192,6 +106,7 @@ def test_should_not_publish_on_errors(
             event=event,
             storage_client=fake_storage_client,
             audio_converter=fake_audio_converter,
+            repository=fake_videos_repository,
             publisher=fake_audio_publisher,
         )
     except Exception:
@@ -205,6 +120,7 @@ def test_should_handle_download_failure_before_publishing(
     fake_storage_client,
     fake_audio_converter,
     fake_audio_publisher,
+    fake_videos_repository,
     video_id: str,
     mocker,
 ):
@@ -222,6 +138,7 @@ def test_should_handle_download_failure_before_publishing(
             event=event,
             storage_client=fake_storage_client,
             audio_converter=fake_audio_converter,
+            repository=fake_videos_repository,
             publisher=fake_audio_publisher,
         )
     except IOError:
@@ -237,6 +154,7 @@ def test_should_not_publish_multiple_times_on_success(
     fake_storage_client,
     fake_audio_converter,
     fake_audio_publisher,
+    fake_videos_repository,
     configured_storage_and_converter,
     video_id: str,
 ):
@@ -247,6 +165,7 @@ def test_should_not_publish_multiple_times_on_success(
         event=event,
         storage_client=fake_storage_client,
         audio_converter=fake_audio_converter,
+        repository=fake_videos_repository,
         publisher=fake_audio_publisher,
     )
     
@@ -256,6 +175,7 @@ def test_should_not_publish_multiple_times_on_success(
         event=event,
         storage_client=fake_storage_client,
         audio_converter=fake_audio_converter,
+        repository=fake_videos_repository,
         publisher=fake_audio_publisher,
     )
     

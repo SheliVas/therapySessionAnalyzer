@@ -51,6 +51,22 @@ class FakeAudioEventPublisher:
         self.published_events.append(event)
 
 
+class FakeVideosRepository:
+    """Fake repository for testing video status updates."""
+    def __init__(self) -> None:
+        self.mark_audio_extracted_calls: list[dict] = []
+        self.should_raise_error = False
+    
+    def mark_audio_extracted(self, video_id: str, audio_path: str) -> None:
+        """Record the call."""
+        self.mark_audio_extracted_calls.append({
+            "video_id": video_id,
+            "audio_path": audio_path,
+        })
+        if self.should_raise_error:
+            raise ValueError("Repository error")
+
+
 # --- Fixtures: Fakes ---
 
 @pytest.fixture
@@ -69,6 +85,12 @@ def fake_audio_converter() -> FakeAudioConverter:
 def fake_audio_publisher() -> FakeAudioEventPublisher:
     """Fixture for FakeAudioEventPublisher."""
     return FakeAudioEventPublisher()
+
+
+@pytest.fixture
+def fake_videos_repository() -> FakeVideosRepository:
+    """Fixture for FakeVideosRepository."""
+    return FakeVideosRepository()
 
 
 # --- Fixtures: Test Data ---

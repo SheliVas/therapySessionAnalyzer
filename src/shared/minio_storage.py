@@ -1,10 +1,9 @@
 from minio import Minio
 
-from src.upload_service.storage import StorageClient
 from src.upload_service.config import MinIOConfig
 
 
-class MinioStorage(StorageClient):
+class MinioStorage:
     """MinIO implementation of StorageClient."""
     
     def __init__(self, config: MinIOConfig):

@@ -3,8 +3,7 @@ from fastapi.testclient import TestClient
 from io import BytesIO
 
 from src.upload_service.app import create_app
-from src.upload_service.storage import StorageClient
-from src.upload_service.domain import VideoEventPublisher, VideosRepository
+from src.upload_service.domain import VideoEventPublisher, VideosRepository, StorageClient
 
 
 # --- Fixtures ---

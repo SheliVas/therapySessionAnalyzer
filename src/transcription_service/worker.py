@@ -4,12 +4,8 @@ from src.transcription_service.domain import (
     TranscriptionBackend,
     generate_transcript,
     StorageClient,
+    TranscriptEventPublisher,
 )
-
-
-class TranscriptEventPublisher:
-    def publish_transcript_created(self, event: TranscriptCreatedEvent) -> None:
-        raise NotImplementedError
 
 
 def process_audio_extracted_event(

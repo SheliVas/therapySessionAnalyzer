@@ -20,6 +20,11 @@ class StorageClient(Protocol):
         ...
 
 
+class TranscriptEventPublisher(Protocol):
+    def publish_transcript_created(self, event: TranscriptCreatedEvent) -> None:
+        ...
+
+
 class TranscriptionBackend(ABC):
     @abstractmethod
     def transcribe(self, audio_bytes: bytes) -> str:

@@ -4,9 +4,13 @@ from datetime import datetime
 from pathlib import Path
 from pymongo import MongoClient
 
-from src.upload_service.domain import VideoEventPublisher, VideosRepository, handle_video_upload
+from src.upload_service.domain import (
+    VideoEventPublisher,
+    VideosRepository,
+    StorageClient,
+    handle_video_upload,
+)
 from src.upload_service.config import get_rabbitmq_config, get_minio_config, get_mongo_config
-from src.upload_service.storage import StorageClient
 from src.upload_service.rabbitmq_publisher import RabbitMQVideoEventPublisher
 from src.shared.minio_storage import MinioStorage
 from src.shared.videos_repository import MongoVideosRepository

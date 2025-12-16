@@ -19,6 +19,14 @@ class VideoEventPublisher(Protocol):
         return
 
 
+class StorageClient(Protocol):
+    """Protocol for file storage operations."""
+    
+    def upload_file(self, bucket: str, key: str, content: bytes) -> None:
+        """Upload a file to storage."""
+        ...
+
+
 class VideosRepository(Protocol):
     """Protocol for persisting video metadata."""
     
@@ -46,7 +54,7 @@ def sanitize_filename(filename: str) -> str:
 
 
 def handle_video_upload(
-    storage_client: "StorageClient",
+    storage_client: StorageClient,
     publisher: VideoEventPublisher,
     repository: VideosRepository,
     filename: str,

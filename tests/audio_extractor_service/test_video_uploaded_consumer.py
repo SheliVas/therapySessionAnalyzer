@@ -13,6 +13,7 @@ from tests.audio_extractor_service.conftest import (
     FakeAudioEventPublisher,
     FakeStorageClient,
     FakeAudioConverter,
+    FakeVideosRepository,
 )
 
 
@@ -79,6 +80,7 @@ def started_consumer(
     fake_storage_client: FakeStorageClient,
     fake_audio_converter: FakeAudioConverter,
     fake_publisher: FakeAudioEventPublisher,
+    fake_videos_repository: FakeVideosRepository,
     video_bytes: bytes,
     audio_bytes: bytes,
     mock_channel_with_callback,
@@ -96,6 +98,7 @@ def started_consumer(
         config=config,
         storage_client=fake_storage_client,
         audio_converter=fake_audio_converter,
+        repository=fake_videos_repository,
         publisher=fake_publisher,
     )
 
@@ -116,6 +119,7 @@ def test_should_connect_with_correct_parameters(
     fake_storage_client: FakeStorageClient,
     fake_audio_converter: FakeAudioConverter,
     fake_publisher: FakeAudioEventPublisher,
+    fake_videos_repository: FakeVideosRepository,
     mocker,
     mock_connection,
     mock_channel,
@@ -127,6 +131,7 @@ def test_should_connect_with_correct_parameters(
         config=config,
         storage_client=fake_storage_client,
         audio_converter=fake_audio_converter,
+        repository=fake_videos_repository,
         publisher=fake_publisher,
     )
 
@@ -150,6 +155,7 @@ def test_should_declare_queue_durable(
     fake_storage_client: FakeStorageClient,
     fake_audio_converter: FakeAudioConverter,
     fake_publisher: FakeAudioEventPublisher,
+    fake_videos_repository: FakeVideosRepository,
     mocker,
     mock_connection,
     mock_channel,
@@ -161,6 +167,7 @@ def test_should_declare_queue_durable(
         config=config,
         storage_client=fake_storage_client,
         audio_converter=fake_audio_converter,
+        repository=fake_videos_repository,
         publisher=fake_publisher,
     )
 
@@ -227,6 +234,7 @@ def test_should_handle_malformed_message_gracefully(
     fake_storage_client: FakeStorageClient,
     fake_audio_converter: FakeAudioConverter,
     fake_publisher: FakeAudioEventPublisher,
+    fake_videos_repository: FakeVideosRepository,
     mocker,
     mock_connection,
     mock_channel,
@@ -246,6 +254,7 @@ def test_should_handle_malformed_message_gracefully(
         config=config,
         storage_client=fake_storage_client,
         audio_converter=fake_audio_converter,
+        repository=fake_videos_repository,
         publisher=fake_publisher,
     )
 

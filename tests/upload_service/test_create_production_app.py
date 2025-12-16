@@ -1,6 +1,5 @@
 import pytest
 from src.upload_service.app import create_production_app
-from src.upload_service.storage import StorageClient
 from src.upload_service.domain import VideoEventPublisher, VideosRepository
 
 # --- Fixtures ---

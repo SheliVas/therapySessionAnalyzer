@@ -8,6 +8,7 @@ from src.audio_extractor_service.domain import (
     AudioEventPublisher,
     StorageClient,
     AudioConverter,
+    VideosRepository,
 )
 from src.audio_extractor_service.worker import process_video_uploaded_event
 
@@ -26,11 +27,13 @@ class RabbitMQVideoUploadedConsumer:
         config: RabbitMQConsumerConfig,
         storage_client: StorageClient,
         audio_converter: AudioConverter,
+        repository: VideosRepository,
         publisher: AudioEventPublisher,
     ) -> None:
         self._config = config
         self._storage_client = storage_client
         self._audio_converter = audio_converter
+        self._repository = repository
         self._publisher = publisher
 
     def run_forever(self) -> None:
@@ -56,6 +59,7 @@ class RabbitMQVideoUploadedConsumer:
                 event,
                 storage_client=self._storage_client,
                 audio_converter=self._audio_converter,
+                repository=self._repository,
                 publisher=self._publisher,
             )
 

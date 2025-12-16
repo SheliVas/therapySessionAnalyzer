@@ -2,8 +2,12 @@ import pytest
 from fastapi.testclient import TestClient
 
 from src.upload_service.app import create_app
-from src.upload_service.domain import VideoUploadedEvent, VideoEventPublisher, VideosRepository
-from src.upload_service.storage import StorageClient
+from src.upload_service.domain import (
+    VideoUploadedEvent,
+    VideoEventPublisher,
+    VideosRepository,
+    StorageClient,
+)
 from datetime import datetime
 
 
