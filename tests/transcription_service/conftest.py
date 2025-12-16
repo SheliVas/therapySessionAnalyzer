@@ -46,6 +46,22 @@ class FakeStorageClient:
         self.upload_called_with = {"bucket": bucket, "key": key, "content": content}
 
 
+class FakeVideosRepository:
+    """Fake repository for testing video status updates."""
+    def __init__(self) -> None:
+        self.mark_transcribed_calls: list[dict] = []
+        self.should_raise_error = False
+    
+    def mark_transcribed(self, video_id: str, transcript_path: str) -> None:
+        """Record the call."""
+        self.mark_transcribed_calls.append({
+            "video_id": video_id,
+            "transcript_path": transcript_path,
+        })
+        if self.should_raise_error:
+            raise ValueError("Repository error")
+
+
 @pytest.fixture
 def audio_bytes() -> bytes:
     return b"fake audio content"
@@ -75,4 +91,10 @@ def fake_storage(audio_bytes: bytes) -> FakeStorageClient:
     client = FakeStorageClient()
     client.set_download_response(audio_bytes)
     return client
+
+
+@pytest.fixture
+def fake_videos_repository() -> FakeVideosRepository:
+    """Fixture for FakeVideosRepository."""
+    return FakeVideosRepository()
 

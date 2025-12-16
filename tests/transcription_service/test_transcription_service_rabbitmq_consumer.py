@@ -73,6 +73,7 @@ def started_consumer(
     config: RabbitMQConsumerConfig,
     fake_storage: FakeStorageClient,
     fake_backend: FakeTranscriptionBackend,
+    fake_videos_repository,
     fake_publisher: FakeTranscriptEventPublisher,
     mock_channel,
     mock_pika,
@@ -83,6 +84,7 @@ def started_consumer(
         config=config,
         storage_client=fake_storage,
         backend=fake_backend,
+        repository=fake_videos_repository,
         publisher=fake_publisher,
     )
     
@@ -102,6 +104,7 @@ def test_should_connect_with_correct_parameters(
     config: RabbitMQConsumerConfig,
     fake_storage: FakeStorageClient,
     fake_backend: FakeTranscriptionBackend,
+    fake_videos_repository,
     fake_publisher: FakeTranscriptEventPublisher,
     mock_channel,
     mock_pika,
@@ -110,6 +113,7 @@ def test_should_connect_with_correct_parameters(
         config=config,
         storage_client=fake_storage,
         backend=fake_backend,
+        repository=fake_videos_repository,
         publisher=fake_publisher,
     )
 
@@ -133,6 +137,7 @@ def test_should_declare_queue_durable(
     config: RabbitMQConsumerConfig,
     fake_storage: FakeStorageClient,
     fake_backend: FakeTranscriptionBackend,
+    fake_videos_repository,
     fake_publisher: FakeTranscriptEventPublisher,
     mock_channel,
     mock_pika,
@@ -141,6 +146,7 @@ def test_should_declare_queue_durable(
         config=config,
         storage_client=fake_storage,
         backend=fake_backend,
+        repository=fake_videos_repository,
         publisher=fake_publisher,
     )
 
@@ -252,6 +258,7 @@ def test_should_handle_malformed_message_gracefully(
     config: RabbitMQConsumerConfig,
     fake_storage: FakeStorageClient,
     fake_backend: FakeTranscriptionBackend,
+    fake_videos_repository,
     fake_publisher: FakeTranscriptEventPublisher,
     mock_channel,
     mock_pika,
@@ -265,6 +272,7 @@ def test_should_handle_malformed_message_gracefully(
         config=config,
         storage_client=fake_storage,
         backend=fake_backend,
+        repository=fake_videos_repository,
         publisher=fake_publisher,
     )
     

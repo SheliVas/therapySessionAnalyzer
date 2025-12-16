@@ -171,3 +171,50 @@ def test_should_not_create_duplicate_when_marking_audio_extracted(
     documents = list(collection.find({"video_id": "video-1"}))
     
     assert len(documents) == 1
+
+
+@pytest.mark.unit
+def test_should_update_status_and_transcript_path_when_marking_transcribed(
+    repository, mongo_client, uploaded_video
+) -> None:
+    repository.mark_transcribed(video_id="video-1", transcript_path="therapy-transcripts/transcripts/video-1/transcript.txt")
+    
+    collection = mongo_client["therapy_analysis"]["videos"]
+    doc = collection.find_one({"video_id": "video-1"})
+    
+    assert doc["status"] == "transcribed"
+    assert doc["transcript_path"] == "therapy-transcripts/transcripts/video-1/transcript.txt"
+
+
+@pytest.mark.unit
+def test_should_preserve_existing_fields_when_marking_transcribed(
+    repository, mongo_client, uploaded_video
+) -> None:
+    repository.mark_transcribed(video_id="video-1", transcript_path="therapy-transcripts/transcripts/video-1/transcript.txt")
+    
+    collection = mongo_client["therapy_analysis"]["videos"]
+    doc = collection.find_one({"video_id": "video-1"})
+    
+    assert doc["filename"] == "session1.mp4"
+    assert doc["storage_path"] == "/data/uploads/video-1/session1.mp4"
+    assert doc["video_id"] == "video-1"
+
+
+@pytest.mark.unit
+def test_should_raise_error_when_marking_nonexistent_video_as_transcribed(
+    repository, mongo_client
+) -> None:
+    with pytest.raises(VideoNotFoundError):
+        repository.mark_transcribed(video_id="missing-video", transcript_path="therapy-transcripts/transcripts/missing-video/transcript.txt")
+
+
+@pytest.mark.unit
+def test_should_not_create_duplicate_when_marking_transcribed(
+    repository, mongo_client, uploaded_video
+) -> None:
+    repository.mark_transcribed(video_id="video-1", transcript_path="therapy-transcripts/transcripts/video-1/transcript.txt")
+    
+    collection = mongo_client["therapy_analysis"]["videos"]
+    documents = list(collection.find({"video_id": "video-1"}))
+    
+    assert len(documents) == 1

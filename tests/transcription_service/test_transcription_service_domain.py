@@ -82,8 +82,10 @@ def test_should_download_audio_from_storage(
     event: AudioExtractedEvent,
     fake_backend: FakeTranscriptionBackend,
     fake_storage: FakeStorageClient,
+    fake_videos_repository,
 ) -> None:
-    generate_transcript(event, fake_backend, fake_storage)
+    from src.transcription_service.domain import generate_transcript
+    generate_transcript(event, fake_backend, fake_storage, fake_videos_repository)
 
     assert fake_storage.download_called_with == {
         "bucket": event.bucket,
@@ -97,8 +99,10 @@ def test_should_call_backend_with_downloaded_bytes(
     fake_backend: FakeTranscriptionBackend,
     fake_storage: FakeStorageClient,
     audio_bytes: bytes,
+    fake_videos_repository,
 ) -> None:
-    generate_transcript(event, fake_backend, fake_storage)
+    from src.transcription_service.domain import generate_transcript
+    generate_transcript(event, fake_backend, fake_storage, fake_videos_repository)
 
     assert len(fake_backend.calls) == 1
     assert fake_backend.calls[0] == audio_bytes
@@ -109,8 +113,10 @@ def test_should_upload_transcript_to_storage(
     event: AudioExtractedEvent,
     fake_backend: FakeTranscriptionBackend,
     fake_storage: FakeStorageClient,
+    fake_videos_repository,
 ) -> None:
-    generate_transcript(event, fake_backend, fake_storage)
+    from src.transcription_service.domain import generate_transcript
+    generate_transcript(event, fake_backend, fake_storage, fake_videos_repository)
 
     assert fake_storage.upload_called_with is not None
     assert fake_storage.upload_called_with["bucket"] == "therapy-transcripts"
@@ -123,11 +129,54 @@ def test_should_return_transcript_created_event_with_correct_metadata(
     event: AudioExtractedEvent,
     fake_backend: FakeTranscriptionBackend,
     fake_storage: FakeStorageClient,
+    fake_videos_repository,
 ) -> None:
-    result = generate_transcript(event, fake_backend, fake_storage)
+    from src.transcription_service.domain import generate_transcript
+    result = generate_transcript(event, fake_backend, fake_storage, fake_videos_repository)
 
     assert isinstance(result, TranscriptCreatedEvent)
     assert result.video_id == event.video_id
     assert result.bucket == "therapy-transcripts"
     assert result.key == f"transcripts/{event.video_id}/transcript.txt"
 
+
+@pytest.mark.unit
+def test_should_call_repository_mark_transcribed_with_correct_path(
+    event: AudioExtractedEvent,
+    fake_backend: FakeTranscriptionBackend,
+    fake_storage: FakeStorageClient,
+    fake_videos_repository,
+) -> None:
+    from src.transcription_service.domain import generate_transcript
+    generate_transcript(event, fake_backend, fake_storage, fake_videos_repository)
+    
+    assert len(fake_videos_repository.mark_transcribed_calls) == 1
+    call = fake_videos_repository.mark_transcribed_calls[0]
+    assert call["video_id"] == event.video_id
+    assert "therapy-transcripts" in call["transcript_path"]
+    assert "transcript.txt" in call["transcript_path"]
+
+
+@pytest.mark.unit
+def test_should_not_publish_on_repository_failure(
+    event: AudioExtractedEvent,
+    fake_backend: FakeTranscriptionBackend,
+    fake_storage: FakeStorageClient,
+    fake_videos_repository,
+    fake_publisher,
+) -> None:
+    from src.transcription_service.domain import generate_transcript
+    from src.transcription_service.worker import process_audio_extracted_event
+    
+    fake_videos_repository.should_raise_error = True
+    
+    with pytest.raises(ValueError, match="Repository error"):
+        process_audio_extracted_event(
+            event=event,
+            storage_client=fake_storage,
+            backend=fake_backend,
+            repository=fake_videos_repository,
+            publisher=fake_publisher,
+        )
+    
+    assert len(fake_publisher.published_events) == 0

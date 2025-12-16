@@ -5,6 +5,7 @@ from src.transcription_service.domain import (
     generate_transcript,
     StorageClient,
     TranscriptEventPublisher,
+    VideosRepository,
 )
 
 
@@ -12,6 +13,7 @@ def process_audio_extracted_event(
     event: AudioExtractedEvent,
     storage_client: StorageClient,
     backend: TranscriptionBackend,
+    repository: VideosRepository,
     publisher: TranscriptEventPublisher,
 ) -> TranscriptCreatedEvent:
     """
@@ -21,12 +23,13 @@ def process_audio_extracted_event(
         event: The AudioExtractedEvent to process.
         storage_client: The storage client to use.
         backend: The transcription backend to use.
+        repository: The repository to update video status.
         publisher: The publisher to send the TranscriptCreatedEvent.
 
     Returns:
         The TranscriptCreatedEvent produced.
     """
-    transcript_event = generate_transcript(event, backend, storage_client)
+    transcript_event = generate_transcript(event, backend, storage_client, repository)
     publisher.publish_transcript_created(transcript_event)
 
     return transcript_event

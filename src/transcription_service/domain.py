@@ -25,6 +25,22 @@ class TranscriptEventPublisher(Protocol):
         ...
 
 
+class VideosRepository(Protocol):
+    """Protocol for managing video metadata status."""
+    
+    def mark_transcribed(self, video_id: str, transcript_path: str) -> None:
+        """Mark a video as transcribed and store the transcript path.
+        
+        Args:
+            video_id: Unique video identifier.
+            transcript_path: Path where the transcript is stored (bucket/key).
+            
+        Raises:
+            VideoNotFoundError: If the video does not exist.
+        """
+        ...
+
+
 class TranscriptionBackend(ABC):
     @abstractmethod
     def transcribe(self, audio_bytes: bytes) -> str:
@@ -36,6 +52,7 @@ def generate_transcript(
     event: AudioExtractedEvent,
     backend: TranscriptionBackend,
     storage_client: StorageClient,
+    repository: VideosRepository,
 ) -> TranscriptCreatedEvent:
     """
     Generate a transcript from an audio file.
@@ -44,6 +61,7 @@ def generate_transcript(
         event: The AudioExtractedEvent containing the audio bucket/key.
         backend: The transcription backend to use.
         storage_client: The storage client to download audio and upload transcript.
+        repository: The repository to update video status.
 
     Returns:
         A TranscriptCreatedEvent with the bucket/key to the transcript file.
@@ -63,6 +81,9 @@ def generate_transcript(
         key=transcript_key,
         content=transcript_text.encode("utf-8")
     )
+
+    transcript_path = f"{transcript_bucket}/{transcript_key}"
+    repository.mark_transcribed(video_id=event.video_id, transcript_path=transcript_path)
 
     return TranscriptCreatedEvent(
         video_id=event.video_id,

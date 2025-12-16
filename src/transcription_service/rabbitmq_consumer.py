@@ -4,7 +4,7 @@ import pika
 from pydantic import BaseModel
 
 from src.audio_extractor_service.domain import AudioExtractedEvent
-from src.transcription_service.domain import TranscriptionBackend, StorageClient
+from src.transcription_service.domain import TranscriptionBackend, StorageClient, VideosRepository
 from src.transcription_service.worker import TranscriptEventPublisher, process_audio_extracted_event
 
 
@@ -22,11 +22,13 @@ class RabbitMQAudioExtractedConsumer:
         config: RabbitMQConsumerConfig,
         storage_client: StorageClient,
         backend: TranscriptionBackend,
+        repository: VideosRepository,
         publisher: TranscriptEventPublisher,
     ) -> None:
         self._config = config
         self._storage_client = storage_client
         self._backend = backend
+        self._repository = repository
         self._publisher = publisher
 
     def run_forever(self) -> None:
@@ -52,6 +54,7 @@ class RabbitMQAudioExtractedConsumer:
                 event,
                 storage_client=self._storage_client,
                 backend=self._backend,
+                repository=self._repository,
                 publisher=self._publisher,
             )
 

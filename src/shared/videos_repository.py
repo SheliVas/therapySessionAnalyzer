@@ -96,3 +96,24 @@ class MongoVideosRepository:
         }
         
         self._update_status(video_id, update_data)
+    
+    def mark_transcribed(
+        self,
+        video_id: str,
+        transcript_path: str,
+    ) -> None:
+        """Mark a video as transcribed and store the transcript path.
+        
+        Args:
+            video_id: Unique video identifier.
+            transcript_path: Path where the transcript is stored (bucket/key).
+            
+        Raises:
+            VideoNotFoundError: If the video does not exist.
+        """
+        update_data = {
+            "status": "transcribed",
+            "transcript_path": transcript_path,
+        }
+        
+        self._update_status(video_id, update_data)
