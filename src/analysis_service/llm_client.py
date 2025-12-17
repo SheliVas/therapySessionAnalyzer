@@ -4,3 +4,11 @@ class LLMClient(Protocol):
     def analyze_transcript(self, transcript_text: str) -> Dict[str, Any]:
         """Analyze the transcript text and return a dictionary of results."""
         ...
+
+class StubLLMClient(LLMClient):
+    def analyze_transcript(self, transcript_text: str) -> Dict[str, Any]:
+        return {
+            "emotion": "neutral",
+            "summary": "Stub analysis",
+            "backend": "stub"
+        }

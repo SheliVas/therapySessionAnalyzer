@@ -1,29 +1,15 @@
 from pymongo import MongoClient
 
 from src.analysis_service.config import load_config
-from src.analysis_service.domain import AnalysisBackend, AnalysisResult, analyze_transcript
 from src.analysis_service.mongo_repository import MongoAnalysisRepository
 from src.analysis_service.rabbitmq_consumer import RabbitMQTranscriptCreatedConsumer
 from src.analysis_service.rabbitmq_publisher import RabbitMQAnalysisEventPublisher
-from src.analysis_service.worker import (
-    AnalysisEventPublisher,
-    AnalysisRepository,
-    AnalysisCompletedEvent,
-)
+from src.analysis_service.redis_client import RedisClient
+from src.analysis_service.llm_client import StubLLMClient
+from src.analysis_service.llm_backend import LLMAnalysisBackend
 from src.shared.minio_storage import MinioStorage
 from src.shared.videos_repository import MongoVideosRepository
 from src.shared.config import get_minio_config
-from src.transcription_service.domain import TranscriptCreatedEvent
-
-
-class SimpleWordCountBackend(AnalysisBackend):
-    def analyze(self, transcript_text: str) -> AnalysisResult:
-        words = transcript_text.split()
-        return AnalysisResult(
-            video_id="",
-            word_count=len(words),
-            extra={"backend": "simple-word-count"},
-        )
 
 
 def main() -> None:
@@ -35,7 +21,20 @@ def main() -> None:
     videos_repository = MongoVideosRepository(mongo_client, db_name=config.mongo_db_name)
     repository = MongoAnalysisRepository(mongo_client, db_name=config.mongo_db_name)
 
-    backend = SimpleWordCountBackend()
+    redis_client = RedisClient(
+        host=config.redis.host,
+        port=config.redis.port,
+        db=config.redis.db,
+        password=config.redis.password,
+    )
+    llm_client = StubLLMClient()
+    backend = LLMAnalysisBackend(
+        llm_client=llm_client,
+        redis_cache=redis_client,
+        cache_ttl_seconds=config.redis.ttl,
+        prompt_id=config.llm_prompt_id,
+    )
+    
     publisher = RabbitMQAnalysisEventPublisher(config.publisher)
 
     consumer = RabbitMQTranscriptCreatedConsumer(
