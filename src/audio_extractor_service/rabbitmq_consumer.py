@@ -1,7 +1,6 @@
 import json
 
 import pika
-from pydantic import BaseModel
 
 from src.upload_service.domain import VideoUploadedEvent
 from src.audio_extractor_service.domain import (
@@ -11,14 +10,10 @@ from src.audio_extractor_service.domain import (
     VideosRepository,
 )
 from src.audio_extractor_service.worker import process_video_uploaded_event
+from src.shared.config import VideoUploadedConsumerConfig
 
 
-class RabbitMQConsumerConfig(BaseModel):
-    host: str
-    port: int
-    username: str
-    password: str
-    queue_name: str = "video.uploaded"
+RabbitMQConsumerConfig = VideoUploadedConsumerConfig
 
 
 class RabbitMQVideoUploadedConsumer:

@@ -6,6 +6,7 @@ from tests.analysis_service.conftest import (
     FakeAnalysisRepository,
     FakeStorageClient,
 )
+from tests.conftest import FakeVideosRepository
 
 
 def test_should_call_backend_analyze_once(
@@ -15,7 +16,8 @@ def test_should_call_backend_analyze_once(
     fake_repository: FakeAnalysisRepository,
     fake_storage_client: FakeStorageClient,
 ) -> None:
-    process_transcript_created_event(event, fake_backend, fake_publisher, fake_repository, fake_storage_client)
+    fake_videos_repository = FakeVideosRepository()
+    process_transcript_created_event(event, fake_backend, fake_publisher, fake_repository, fake_storage_client, fake_videos_repository)
 
     expected_calls = 1
     actual_calls = len(fake_backend.calls)
@@ -33,7 +35,8 @@ def test_should_return_analysis_completed_event_with_video_id_matching_event(
     fake_repository: FakeAnalysisRepository,
     fake_storage_client: FakeStorageClient,
 ) -> None:
-    result = process_transcript_created_event(event, fake_backend, fake_publisher, fake_repository, fake_storage_client)
+    fake_videos_repository = FakeVideosRepository()
+    result = process_transcript_created_event(event, fake_backend, fake_publisher, fake_repository, fake_storage_client, fake_videos_repository)
 
     expected_video_id = event.video_id
     actual_video_id = result.video_id
@@ -47,7 +50,8 @@ def test_should_return_analysis_completed_event_with_correct_word_count(
     fake_repository: FakeAnalysisRepository,
     fake_storage_client: FakeStorageClient,
 ) -> None:
-    result = process_transcript_created_event(event, fake_backend, fake_publisher, fake_repository, fake_storage_client)
+    fake_videos_repository = FakeVideosRepository()
+    result = process_transcript_created_event(event, fake_backend, fake_publisher, fake_repository, fake_storage_client, fake_videos_repository)
 
     expected_word_count = 3
     actual_word_count = result.word_count
@@ -61,7 +65,8 @@ def test_should_return_analysis_completed_event_with_correct_extra_data(
     fake_repository: FakeAnalysisRepository,
     fake_storage_client: FakeStorageClient,
 ) -> None:
-    result = process_transcript_created_event(event, fake_backend, fake_publisher, fake_repository, fake_storage_client)
+    fake_videos_repository = FakeVideosRepository()
+    result = process_transcript_created_event(event, fake_backend, fake_publisher, fake_repository, fake_storage_client, fake_videos_repository)
 
     expected_extra = {"backend": "fake"}
     actual_extra = result.extra
@@ -75,7 +80,8 @@ def test_should_publish_exactly_one_event_equal_to_returned_event(
     fake_repository: FakeAnalysisRepository,
     fake_storage_client: FakeStorageClient,
 ) -> None:
-    result = process_transcript_created_event(event, fake_backend, fake_publisher, fake_repository, fake_storage_client)
+    fake_videos_repository = FakeVideosRepository()
+    result = process_transcript_created_event(event, fake_backend, fake_publisher, fake_repository, fake_storage_client, fake_videos_repository)
 
     expected_count = 1
     actual_count = len(fake_publisher.published_events)
@@ -93,7 +99,8 @@ def test_should_save_exactly_one_event_equal_to_returned_event(
     fake_repository: FakeAnalysisRepository,
     fake_storage_client: FakeStorageClient,
 ) -> None:
-    result = process_transcript_created_event(event, fake_backend, fake_publisher, fake_repository, fake_storage_client)
+    fake_videos_repository = FakeVideosRepository()
+    result = process_transcript_created_event(event, fake_backend, fake_publisher, fake_repository, fake_storage_client, fake_videos_repository)
 
     expected_count = 1
     actual_count = len(fake_repository.saved_events)
@@ -102,3 +109,4 @@ def test_should_save_exactly_one_event_equal_to_returned_event(
     expected_event = result
     actual_event = fake_repository.saved_events[0]
     assert actual_event == expected_event
+

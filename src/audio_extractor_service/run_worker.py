@@ -8,12 +8,9 @@ from pymongo import MongoClient
 
 from src.audio_extractor_service.config import RabbitMQConsumerConfig
 from src.audio_extractor_service.rabbitmq_consumer import RabbitMQVideoUploadedConsumer
-from src.audio_extractor_service.rabbitmq_publisher import (
-    RabbitMQConfig as PublisherConfig,
-    RabbitMQAudioEventPublisher,
-)
+from src.audio_extractor_service.rabbitmq_publisher import RabbitMQAudioEventPublisher
 from src.audio_extractor_service.domain import AudioConverter
-from src.upload_service.config import MinIOConfig
+from src.shared.config import MinIOConfig, AudioExtractedPublisherConfig
 from src.shared.minio_storage import MinioStorage
 from src.shared.videos_repository import MongoVideosRepository
 
@@ -69,7 +66,7 @@ def create_production_app() -> dict:
         queue_name=os.environ.get("RABBITMQ_QUEUE", "video.uploaded"),
     )
 
-    publisher_config = PublisherConfig(
+    publisher_config = AudioExtractedPublisherConfig(
         host=os.environ["RABBITMQ_HOST"],
         port=int(os.environ["RABBITMQ_PORT"]),
         username=os.environ["RABBITMQ_USER"],

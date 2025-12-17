@@ -1,7 +1,7 @@
 import pytest
 
 from src.shared.minio_storage import MinioStorage
-from src.upload_service.config import MinIOConfig
+from src.shared.config import MinIOConfig
 
 
 # --- Config Tests ---

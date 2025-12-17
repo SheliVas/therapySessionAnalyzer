@@ -40,6 +40,7 @@ class FakeVideosRepository:
     def __init__(self) -> None:
         self.mark_audio_extracted_calls: list[dict] = []
         self.mark_transcribed_calls: list[dict] = []
+        self.mark_analyzed_calls: list[dict] = []
         self.should_raise_error = False
     
     def mark_audio_extracted(self, video_id: str, audio_path: str) -> None:
@@ -56,6 +57,15 @@ class FakeVideosRepository:
         self.mark_transcribed_calls.append({
             "video_id": video_id,
             "transcript_path": transcript_path,
+        })
+        if self.should_raise_error:
+            raise ValueError("Repository error")
+    
+    def mark_analyzed(self, video_id: str, word_count: int) -> None:
+        """Record mark_analyzed call."""
+        self.mark_analyzed_calls.append({
+            "video_id": video_id,
+            "word_count": word_count,
         })
         if self.should_raise_error:
             raise ValueError("Repository error")

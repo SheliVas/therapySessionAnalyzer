@@ -2,12 +2,12 @@ import os
 from pydantic import BaseModel
 
 from src.analysis_service.rabbitmq_consumer import RabbitMQConsumerConfig
-from src.analysis_service.rabbitmq_publisher import RabbitMQConfig as PublisherConfig
+from src.shared.config import MinIOConfig, AnalysisCompletedPublisherConfig
 
 
 class AnalysisServiceConfig(BaseModel):
     consumer: RabbitMQConsumerConfig
-    publisher: PublisherConfig
+    publisher: AnalysisCompletedPublisherConfig
     mongo_uri: str
     mongo_db_name: str
 
@@ -32,7 +32,7 @@ def load_config() -> AnalysisServiceConfig:
         queue_name=transcript_created_queue,
     )
 
-    publisher_config = PublisherConfig(
+    publisher_config = AnalysisCompletedPublisherConfig(
         host=host,
         port=port,
         username=user,

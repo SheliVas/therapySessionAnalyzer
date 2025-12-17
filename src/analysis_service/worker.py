@@ -26,12 +26,20 @@ class AnalysisRepository(ABC):
         ...
 
 
+class VideosRepository(ABC):
+    @abstractmethod
+    def mark_analyzed(self, video_id: str, word_count: int) -> None:
+        """Mark a video as analyzed with word count."""
+        ...
+
+
 def process_transcript_created_event(
     event: TranscriptCreatedEvent,
     backend: AnalysisBackend,
     publisher: AnalysisEventPublisher,
     repository: AnalysisRepository,
     storage_client: StorageClient,
+    videos_repository: VideosRepository,
 ) -> AnalysisCompletedEvent:
     """Process a TranscriptCreatedEvent and publish an AnalysisCompletedEvent.
 
@@ -41,6 +49,7 @@ def process_transcript_created_event(
         publisher: The event publisher to use.
         repository: The repository to save the analysis to.
         storage_client: The storage client to download the transcript.
+        videos_repository: The videos repository to mark analysis status.
 
     Returns:
         The AnalysisCompletedEvent that was published and saved.
@@ -51,6 +60,9 @@ def process_transcript_created_event(
         word_count=analysis_result.word_count,
         extra=analysis_result.extra,
     )
+    
+    videos_repository.mark_analyzed(analysis_result.video_id, analysis_result.word_count)
+    
     repository.save_analysis(completed_event)
     publisher.publish_analysis_completed(completed_event)
     return completed_event

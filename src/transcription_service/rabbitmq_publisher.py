@@ -1,23 +1,15 @@
 import json
 
 import pika
-from pydantic import BaseModel
 
 from src.transcription_service.domain import TranscriptCreatedEvent
 from src.transcription_service.worker import TranscriptEventPublisher
-
-
-class RabbitMQConfig(BaseModel):
-    host: str
-    port: int
-    username: str
-    password: str
-    queue_name: str = "transcript.created"
+from src.shared.config import TranscriptCreatedPublisherConfig
 
 
 class RabbitMQTranscriptEventPublisher(TranscriptEventPublisher):
 
-    def __init__(self, config: RabbitMQConfig) -> None:
+    def __init__(self, config: TranscriptCreatedPublisherConfig) -> None:
         self._config = config
 
     def publish_transcript_created(self, event: TranscriptCreatedEvent) -> None:

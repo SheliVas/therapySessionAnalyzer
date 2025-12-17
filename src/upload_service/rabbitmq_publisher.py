@@ -1,21 +1,13 @@
 import json
 
 import pika
-from pydantic import BaseModel
 
 from src.upload_service.domain import VideoUploadedEvent, VideoEventPublisher
-
-
-class RabbitMQConfig(BaseModel):
-    host: str
-    port: int
-    username: str
-    password: str
-    queue_name: str = "video.uploaded"
+from src.shared.config import VideoUploadedPublisherConfig
 
 
 class RabbitMQVideoEventPublisher(VideoEventPublisher):
-    def __init__(self, config: RabbitMQConfig) -> None:
+    def __init__(self, config: VideoUploadedPublisherConfig) -> None:
         self._config = config
 
     def publish_video_uploaded(self, event: VideoUploadedEvent) -> None:

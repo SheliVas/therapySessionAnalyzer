@@ -1,5 +1,3 @@
-from pathlib import Path
-
 from pymongo import MongoClient
 
 from src.analysis_service.config import load_config
@@ -12,6 +10,9 @@ from src.analysis_service.worker import (
     AnalysisRepository,
     AnalysisCompletedEvent,
 )
+from src.shared.minio_storage import MinioStorage
+from src.shared.videos_repository import MongoVideosRepository
+from src.shared.config import get_minio_config
 from src.transcription_service.domain import TranscriptCreatedEvent
 
 
@@ -24,11 +25,15 @@ class SimpleWordCountBackend(AnalysisBackend):
             extra={"backend": "simple-word-count"},
         )
 
+
 def main() -> None:
     config = load_config()
+    minio_config = get_minio_config()
+    storage_client = MinioStorage(minio_config)
 
-    client = MongoClient(config.mongo_uri)
-    repository = MongoAnalysisRepository(client, db_name=config.mongo_db_name)
+    mongo_client = MongoClient(config.mongo_uri)
+    videos_repository = MongoVideosRepository(mongo_client, db_name=config.mongo_db_name)
+    repository = MongoAnalysisRepository(mongo_client, db_name=config.mongo_db_name)
 
     backend = SimpleWordCountBackend()
     publisher = RabbitMQAnalysisEventPublisher(config.publisher)
@@ -38,6 +43,8 @@ def main() -> None:
         backend=backend,
         publisher=publisher,
         repository=repository,
+        storage_client=storage_client,
+        videos_repository=videos_repository,
     )
 
     consumer.run_forever()

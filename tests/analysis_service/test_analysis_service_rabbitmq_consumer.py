@@ -15,6 +15,7 @@ from tests.analysis_service.conftest import (
     FakeAnalysisRepository,
     FakeStorageClient,
 )
+from tests.conftest import FakeVideosRepository
 
 
 # --- Fixtures ---
@@ -82,6 +83,7 @@ def started_consumer(
 ) -> tuple[RabbitMQTranscriptCreatedConsumer, Any, Callable]:
     """Fixture that sets up and starts a consumer, returning the consumer, channel, and callback."""
     mock_channel.start_consuming.side_effect = KeyboardInterrupt
+    fake_videos_repository = FakeVideosRepository()
     
     consumer = RabbitMQTranscriptCreatedConsumer(
         config=config,
@@ -89,6 +91,7 @@ def started_consumer(
         publisher=fake_publisher,
         repository=fake_repository,
         storage_client=fake_storage_client,
+        videos_repository=fake_videos_repository,
     )
     
     try:
@@ -112,12 +115,14 @@ def test_should_connect_with_correct_parameters(
     mock_channel,
     mock_pika,
 ):
+    fake_videos_repository = FakeVideosRepository()
     consumer = RabbitMQTranscriptCreatedConsumer(
         config=config,
         backend=fake_backend,
         publisher=fake_publisher,
         repository=fake_repository,
         storage_client=fake_storage_client,
+        videos_repository=fake_videos_repository,
     )
 
     mock_channel.start_consuming.side_effect = KeyboardInterrupt
@@ -145,12 +150,14 @@ def test_should_declare_queue_durable(
     mock_channel,
     mock_pika,
 ):
+    fake_videos_repository = FakeVideosRepository()
     consumer = RabbitMQTranscriptCreatedConsumer(
         config=config,
         backend=fake_backend,
         publisher=fake_publisher,
         repository=fake_repository,
         storage_client=fake_storage_client,
+        videos_repository=fake_videos_repository,
     )
 
     mock_channel.start_consuming.side_effect = KeyboardInterrupt
@@ -268,6 +275,7 @@ def test_should_handle_malformed_message_gracefully(
     mocker,
 ):
     mock_channel.start_consuming.side_effect = KeyboardInterrupt
+    fake_videos_repository = FakeVideosRepository()
     
     consumer = RabbitMQTranscriptCreatedConsumer(
         config=config,
@@ -275,6 +283,7 @@ def test_should_handle_malformed_message_gracefully(
         publisher=fake_publisher,
         repository=fake_repository,
         storage_client=fake_storage_client,
+        videos_repository=fake_videos_repository,
     )
     
     try:

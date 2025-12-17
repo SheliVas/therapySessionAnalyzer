@@ -4,12 +4,12 @@ from pathlib import Path
 from pydantic import BaseModel
 
 from src.audio_extractor_service.rabbitmq_consumer import RabbitMQConsumerConfig
-from src.audio_extractor_service.rabbitmq_publisher import RabbitMQConfig as RabbitMQPublisherConfig
+from src.shared.config import AudioExtractedRabbitMQConfig
 
 
 class AudioExtractorConfig(BaseModel):
     consumer: RabbitMQConsumerConfig
-    publisher: RabbitMQPublisherConfig
+    publisher: AudioExtractedRabbitMQConfig
     base_output_dir: Path
 
 
@@ -33,7 +33,7 @@ def load_config() -> AudioExtractorConfig:
         queue_name=video_uploaded_queue,
     )
 
-    publisher_cfg = RabbitMQPublisherConfig(
+    publisher_cfg = AudioExtractedRabbitMQConfig(
         host=host,
         port=port,
         username=user,

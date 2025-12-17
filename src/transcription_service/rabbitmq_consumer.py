@@ -1,19 +1,14 @@
 import json
 
 import pika
-from pydantic import BaseModel
 
 from src.audio_extractor_service.domain import AudioExtractedEvent
 from src.transcription_service.domain import TranscriptionBackend, StorageClient, VideosRepository
 from src.transcription_service.worker import TranscriptEventPublisher, process_audio_extracted_event
+from src.shared.config import AudioExtractedConsumerConfig
 
 
-class RabbitMQConsumerConfig(BaseModel):
-    host: str
-    port: int
-    username: str
-    password: str
-    queue_name: str = "audio.extracted"
+RabbitMQConsumerConfig = AudioExtractedConsumerConfig
 
 
 class RabbitMQAudioExtractedConsumer:

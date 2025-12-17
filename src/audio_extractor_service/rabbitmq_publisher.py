@@ -1,23 +1,15 @@
 import json
 
 import pika
-from pydantic import BaseModel
 
 from src.audio_extractor_service.domain import AudioExtractedEvent
 from src.audio_extractor_service.worker import AudioEventPublisher
-
-
-class RabbitMQConfig(BaseModel):
-    host: str
-    port: int
-    username: str
-    password: str
-    queue_name: str = "audio.extracted"
+from src.shared.config import AudioExtractedPublisherConfig
 
 
 class RabbitMQAudioEventPublisher(AudioEventPublisher):
 
-    def __init__(self, config: RabbitMQConfig) -> None:
+    def __init__(self, config: AudioExtractedPublisherConfig) -> None:
         self._config = config
 
     def publish_audio_extracted(self, event: AudioExtractedEvent) -> None:

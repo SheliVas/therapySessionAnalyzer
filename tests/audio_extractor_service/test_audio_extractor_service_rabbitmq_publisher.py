@@ -4,15 +4,13 @@ import pika
 import pytest
 
 from src.audio_extractor_service.domain import AudioExtractedEvent
-from src.audio_extractor_service.rabbitmq_publisher import (
-    RabbitMQConfig,
-    RabbitMQAudioEventPublisher,
-)
+from src.audio_extractor_service.rabbitmq_publisher import RabbitMQAudioEventPublisher
+from src.shared.config import AudioExtractedRabbitMQConfig
 
 
 @pytest.fixture
-def config() -> RabbitMQConfig:
-    return RabbitMQConfig(
+def config() -> AudioExtractedRabbitMQConfig:
+    return AudioExtractedRabbitMQConfig(
         host="rabbitmq",
         port=5672,
         username="guest",
@@ -31,7 +29,7 @@ def event() -> AudioExtractedEvent:
 
 
 def test_should_connect_with_correct_parameters(
-    config: RabbitMQConfig,
+    config: AudioExtractedRabbitMQConfig,
     event: AudioExtractedEvent,
     mocker,
     mock_connection,
@@ -53,7 +51,7 @@ def test_should_connect_with_correct_parameters(
 
 
 def test_should_declare_queue_with_correct_name_and_durable(
-    config: RabbitMQConfig,
+    config: AudioExtractedRabbitMQConfig,
     event: AudioExtractedEvent,
     mocker,
     mock_connection,
@@ -71,7 +69,7 @@ def test_should_declare_queue_with_correct_name_and_durable(
 
 
 def test_should_publish_event_as_json_to_correct_queue(
-    config: RabbitMQConfig,
+    config: AudioExtractedRabbitMQConfig,
     event: AudioExtractedEvent,
     mocker,
     mock_connection,
@@ -95,7 +93,7 @@ def test_should_publish_event_as_json_to_correct_queue(
 
 
 def test_should_close_connection_after_publishing(
-    config: RabbitMQConfig,
+    config: AudioExtractedRabbitMQConfig,
     event: AudioExtractedEvent,
     mocker,
     mock_connection,

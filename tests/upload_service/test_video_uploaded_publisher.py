@@ -5,18 +5,16 @@ import pika
 import pytest
 
 from src.upload_service.domain import VideoUploadedEvent
-from src.upload_service.rabbitmq_publisher import (
-    RabbitMQConfig,
-    RabbitMQVideoEventPublisher,
-)
+from src.upload_service.rabbitmq_publisher import RabbitMQVideoEventPublisher
+from src.shared.config import VideoUploadedRabbitMQConfig
 
 
 # --- Fixtures ---
 
 
 @pytest.fixture
-def config() -> RabbitMQConfig:
-    return RabbitMQConfig(
+def config() -> VideoUploadedRabbitMQConfig:
+    return VideoUploadedRabbitMQConfig(
         host="rabbitmq",
         port=5672,
         username="guest",
@@ -41,7 +39,7 @@ def event() -> VideoUploadedEvent:
 
 @pytest.mark.unit
 def test_should_connect_with_correct_parameters(
-    config: RabbitMQConfig,
+    config: VideoUploadedRabbitMQConfig,
     event: VideoUploadedEvent,
     mocker,
     mock_connection,
@@ -62,7 +60,7 @@ def test_should_connect_with_correct_parameters(
 
 @pytest.mark.unit
 def test_should_declare_queue_with_correct_name_and_durable(
-    config: RabbitMQConfig,
+    config: VideoUploadedRabbitMQConfig,
     event: VideoUploadedEvent,
     mocker,
     mock_connection,
@@ -81,7 +79,7 @@ def test_should_declare_queue_with_correct_name_and_durable(
 
 @pytest.mark.unit
 def test_should_publish_event_as_json_to_correct_queue(
-    config: RabbitMQConfig,
+    config: VideoUploadedRabbitMQConfig,
     event: VideoUploadedEvent,
     mocker,
     mock_connection,
@@ -108,7 +106,7 @@ def test_should_publish_event_as_json_to_correct_queue(
 
 @pytest.mark.unit
 def test_should_close_connection_after_publishing(
-    config: RabbitMQConfig,
+    config: VideoUploadedRabbitMQConfig,
     event: VideoUploadedEvent,
     mocker,
     mock_connection,
@@ -129,7 +127,7 @@ def test_should_close_connection_after_publishing(
     ("vid-1", "test.mp4", "bucket", ""),
 ])
 def test_should_publish_event_with_empty_fields(
-    config: RabbitMQConfig,
+    config: VideoUploadedRabbitMQConfig,
     mocker,
     mock_connection,
     mock_channel,

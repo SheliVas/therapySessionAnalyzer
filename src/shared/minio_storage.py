@@ -1,6 +1,6 @@
 from minio import Minio
 
-from src.upload_service.config import MinIOConfig
+from src.shared.config import MinIOConfig
 
 
 class MinioStorage:

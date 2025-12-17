@@ -4,18 +4,16 @@ import pika
 import pytest
 
 from src.transcription_service.domain import TranscriptCreatedEvent
-from src.transcription_service.rabbitmq_publisher import (
-    RabbitMQConfig,
-    RabbitMQTranscriptEventPublisher,
-)
+from src.transcription_service.rabbitmq_publisher import RabbitMQTranscriptEventPublisher
+from src.shared.config import TranscriptCreatedRabbitMQConfig
 
 
 # --- Fixtures ---
 
 
 @pytest.fixture
-def config() -> RabbitMQConfig:
-    return RabbitMQConfig(
+def config() -> TranscriptCreatedRabbitMQConfig:
+    return TranscriptCreatedRabbitMQConfig(
         host="rabbitmq",
         port=5672,
         username="guest",
@@ -38,7 +36,7 @@ def event() -> TranscriptCreatedEvent:
 
 @pytest.mark.unit
 def test_should_connect_with_correct_parameters(
-    config: RabbitMQConfig,
+    config: TranscriptCreatedRabbitMQConfig,
     event: TranscriptCreatedEvent,
     mocker,
     mock_connection,
@@ -59,7 +57,7 @@ def test_should_connect_with_correct_parameters(
 
 @pytest.mark.unit
 def test_should_declare_queue_with_correct_name_and_durable(
-    config: RabbitMQConfig,
+    config: TranscriptCreatedRabbitMQConfig,
     event: TranscriptCreatedEvent,
     mocker,
     mock_connection,
@@ -78,7 +76,7 @@ def test_should_declare_queue_with_correct_name_and_durable(
 
 @pytest.mark.unit
 def test_should_publish_event_as_json_to_correct_queue(
-    config: RabbitMQConfig,
+    config: TranscriptCreatedRabbitMQConfig,
     event: TranscriptCreatedEvent,
     mocker,
     mock_connection,
@@ -103,7 +101,7 @@ def test_should_publish_event_as_json_to_correct_queue(
 
 @pytest.mark.unit
 def test_should_close_connection_after_publishing(
-    config: RabbitMQConfig,
+    config: TranscriptCreatedRabbitMQConfig,
     event: TranscriptCreatedEvent,
     mocker,
     mock_connection,

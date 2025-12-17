@@ -1,22 +1,14 @@
 import json
 
 import pika
-from pydantic import BaseModel
 
 from src.analysis_service.worker import AnalysisCompletedEvent, AnalysisEventPublisher
-
-
-class RabbitMQConfig(BaseModel):
-    host: str
-    port: int
-    username: str
-    password: str
-    queue_name: str = "analysis.completed"
+from src.shared.config import AnalysisCompletedPublisherConfig
 
 
 class RabbitMQAnalysisEventPublisher(AnalysisEventPublisher):
 
-    def __init__(self, config: RabbitMQConfig) -> None:
+    def __init__(self, config: AnalysisCompletedPublisherConfig) -> None:
         self._config = config
 
     def publish_analysis_completed(self, event: AnalysisCompletedEvent) -> None:

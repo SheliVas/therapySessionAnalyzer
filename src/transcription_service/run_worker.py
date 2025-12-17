@@ -8,11 +8,9 @@ from src.transcription_service.rabbitmq_consumer import (
     RabbitMQConsumerConfig,
     RabbitMQAudioExtractedConsumer,
 )
-from src.transcription_service.rabbitmq_publisher import (
-    RabbitMQConfig as PublisherConfig,
-    RabbitMQTranscriptEventPublisher,
-)
+from src.transcription_service.rabbitmq_publisher import RabbitMQTranscriptEventPublisher
 from src.transcription_service.domain import TranscriptionBackend, StorageClient
+from src.shared.config import TranscriptCreatedPublisherConfig
 
 
 class StubTranscriptionBackend(TranscriptionBackend):
@@ -40,7 +38,7 @@ def main() -> None:
         queue_name=os.environ.get("AUDIO_EXTRACTED_QUEUE", "audio.extracted"),
     )
 
-    publisher_config = PublisherConfig(
+    publisher_config = TranscriptCreatedPublisherConfig(
         host=os.environ["RABBITMQ_HOST"],
         port=int(os.environ["RABBITMQ_PORT"]),
         username=os.environ["RABBITMQ_USER"],

@@ -4,12 +4,12 @@ from pathlib import Path
 from pydantic import BaseModel
 
 from src.transcription_service.rabbitmq_consumer import RabbitMQConsumerConfig
-from src.transcription_service.rabbitmq_publisher import RabbitMQConfig as PublisherConfig
+from src.shared.config import TranscriptCreatedRabbitMQConfig
 
 
 class TranscriptionConfig(BaseModel):
     consumer: RabbitMQConsumerConfig
-    publisher: PublisherConfig
+    publisher: TranscriptCreatedRabbitMQConfig
     base_output_dir: Path
 
 
@@ -33,7 +33,7 @@ def load_config() -> TranscriptionConfig:
         queue_name=audio_extracted_queue,
     )
 
-    publisher_cfg = PublisherConfig(
+    publisher_cfg = TranscriptCreatedRabbitMQConfig(
         host=host,
         port=port,
         username=user,

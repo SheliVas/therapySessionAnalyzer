@@ -4,18 +4,16 @@ import pika
 import pytest
 
 from src.analysis_service.worker import AnalysisCompletedEvent
-from src.analysis_service.rabbitmq_publisher import (
-    RabbitMQConfig,
-    RabbitMQAnalysisEventPublisher,
-)
+from src.analysis_service.rabbitmq_publisher import RabbitMQAnalysisEventPublisher
+from src.shared.config import AnalysisCompletedRabbitMQConfig
 
 
 # --- Fixtures ---
 
 
 @pytest.fixture
-def config() -> RabbitMQConfig:
-    return RabbitMQConfig(
+def config() -> AnalysisCompletedRabbitMQConfig:
+    return AnalysisCompletedRabbitMQConfig(
         host="rabbitmq",
         port=5672,
         username="guest",
@@ -38,7 +36,7 @@ def event() -> AnalysisCompletedEvent:
 
 @pytest.mark.unit
 def test_should_connect_with_correct_parameters(
-    config: RabbitMQConfig,
+    config: AnalysisCompletedRabbitMQConfig,
     event: AnalysisCompletedEvent,
     mocker,
     mock_connection,
@@ -59,7 +57,7 @@ def test_should_connect_with_correct_parameters(
 
 @pytest.mark.unit
 def test_should_declare_queue_with_correct_name_and_durable(
-    config: RabbitMQConfig,
+    config: AnalysisCompletedRabbitMQConfig,
     event: AnalysisCompletedEvent,
     mocker,
     mock_connection,
@@ -78,7 +76,7 @@ def test_should_declare_queue_with_correct_name_and_durable(
 
 @pytest.mark.unit
 def test_should_publish_event_as_json_to_correct_queue(
-    config: RabbitMQConfig,
+    config: AnalysisCompletedRabbitMQConfig,
     event: AnalysisCompletedEvent,
     mocker,
     mock_connection,
@@ -103,7 +101,7 @@ def test_should_publish_event_as_json_to_correct_queue(
 
 @pytest.mark.unit
 def test_should_close_connection_after_publishing(
-    config: RabbitMQConfig,
+    config: AnalysisCompletedRabbitMQConfig,
     event: AnalysisCompletedEvent,
     mocker,
     mock_connection,
