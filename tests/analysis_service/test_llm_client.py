@@ -55,7 +55,7 @@ def test_openai_client_should_build_request_and_parse_response(mocker, llm_confi
 
 @pytest.mark.unit
 def test_config_wiring_should_select_openai_client_when_key_present(mocker):
-    mocker.patch.dict(os.environ, {"LLM_API_KEY": "real-key"})
+    mocker.patch.dict(os.environ, {"OPENAI_API_KEY": "real-key"})
     config = load_config()
     client = get_llm_client(
         api_key=config.llm.api_key,
@@ -67,7 +67,7 @@ def test_config_wiring_should_select_openai_client_when_key_present(mocker):
 
 @pytest.mark.unit
 def test_config_wiring_should_raise_error_when_key_missing(mocker):
-    mocker.patch.dict(os.environ, {"LLM_API_KEY": ""})
+    mocker.patch.dict(os.environ, {"OPENAI_API_KEY": ""})
     config = load_config()
     with pytest.raises(ValueError, match="API key must be provided"):
         get_llm_client(
