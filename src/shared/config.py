@@ -113,7 +113,7 @@ def get_minio_config() -> MinIOConfig:
 def get_mongo_config() -> MongoConfig:
     """Load MongoDB configuration from environment variables."""
     uri = os.getenv("MONGO_URI", "mongodb://localhost:27017")
-    db_name = os.getenv("MONGO_DB_NAME", "therapy_analysis")
+    db_name = os.getenv("MONGO_DB", "therapy_analysis")
 
     return MongoConfig(
         uri=uri,

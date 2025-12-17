@@ -33,7 +33,7 @@ def load_config() -> AnalysisServiceConfig:
     analysis_completed_queue = os.getenv("ANALYSIS_COMPLETED_QUEUE", "analysis.completed")
 
     mongo_uri = os.getenv("MONGO_URI", "mongodb://mongo:27017/")
-    mongo_db_name = os.getenv("MONGO_DB_NAME", "therapy_analysis")
+    mongo_db_name = os.getenv("MONGO_DB", "therapy_analysis")
 
     redis_host = os.getenv("REDIS_HOST", "redis")
     redis_port = int(os.getenv("REDIS_PORT", "6379"))

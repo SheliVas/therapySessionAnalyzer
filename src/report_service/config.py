@@ -9,7 +9,7 @@ class ReportServiceConfig(BaseModel):
 
 def load_config() -> ReportServiceConfig:
     mongo_uri = os.getenv("MONGO_URI", "mongodb://mongo:27017/")
-    mongo_db_name = os.getenv("MONGO_DB_NAME", "therapy_analysis")
+    mongo_db_name = os.getenv("MONGO_DB", "therapy_analysis")
 
     return ReportServiceConfig(
         mongo_uri=mongo_uri,

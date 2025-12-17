@@ -20,6 +20,25 @@ services:
     ports:
       - "27017:27017"
 
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+
+  minio:
+    image: minio/minio
+    container_name: minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server /data --console-address ":9001"
+    volumes:
+      - ./data/minio:/data
+
   upload_service:
     build:
       context: .
@@ -30,12 +49,22 @@ services:
     depends_on:
       rabbitmq:
         condition: service_healthy
+      mongo:
+        condition: service_started
+      minio:
+        condition: service_started
     environment:
       RABBITMQ_HOST: ${RABBITMQ_HOST}
       RABBITMQ_PORT: ${RABBITMQ_PORT}
       RABBITMQ_USER: ${RABBITMQ_USER}
       RABBITMQ_PASS: ${RABBITMQ_PASS}
       RABBITMQ_QUEUE: video.uploaded
+      MONGO_URI: mongodb://mongo:27017/
+      MONGO_DB: therapy_analysis
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_SECURE: "false"
     volumes:
       - ./data:/app/data
 
@@ -47,6 +76,10 @@ services:
     depends_on:
       rabbitmq:
         condition: service_healthy
+      mongo:
+        condition: service_started
+      minio:
+        condition: service_started
     environment:
       RABBITMQ_HOST: ${RABBITMQ_HOST}
       RABBITMQ_PORT: ${RABBITMQ_PORT}
@@ -55,6 +88,12 @@ services:
       RABBITMQ_QUEUE: video.uploaded
       AUDIO_OUTPUT_BASE_DIR: /app/data/audio
       AUDIO_EXTRACTED_QUEUE: audio.extracted
+      MONGO_URI: mongodb://mongo:27017/
+      MONGO_DB: therapy_analysis
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_SECURE: "false"
     volumes:
       - ./data:/app/data
 
@@ -66,6 +105,10 @@ services:
     depends_on:
       rabbitmq:
         condition: service_healthy
+      mongo:
+        condition: service_started
+      minio:
+        condition: service_started
     environment:
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_PORT: "5672"
@@ -74,6 +117,12 @@ services:
       AUDIO_EXTRACTED_QUEUE: audio.extracted
       TRANSCRIPT_CREATED_QUEUE: transcript.created
       TRANSCRIPT_OUTPUT_BASE_DIR: /app/data/transcripts
+      MONGO_URI: mongodb://mongo:27017/
+      MONGO_DB: therapy_analysis
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_SECURE: "false"
     volumes:
       - ./data:/app/data
 
@@ -83,8 +132,14 @@ services:
       dockerfile: Dockerfile.analysis_service
     container_name: analysis_service
     depends_on:
-      - rabbitmq
-      - mongo
+      rabbitmq:
+        condition: service_healthy
+      mongo:
+        condition: service_started
+      redis:
+        condition: service_started
+      minio:
+        condition: service_started
     environment:
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_PORT: "5672"
@@ -93,7 +148,15 @@ services:
       TRANSCRIPT_CREATED_QUEUE: transcript.created
       ANALYSIS_COMPLETED_QUEUE: analysis.completed
       MONGO_URI: mongodb://mongo:27017/
-      MONGO_DB_NAME: therapy_analysis
+      MONGO_DB: therapy_analysis
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_DB: 0
+      REDIS_TTL: 3600
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_SECURE: "false"
     volumes:
       - ./data:/app/data
 
@@ -106,7 +169,7 @@ services:
       - mongo
     environment:
       MONGO_URI: mongodb://mongo:27017/
-      MONGO_DB_NAME: therapy_analysis
+      MONGO_DB: therapy_analysis
     ports:
       - "8001:8001"
 
