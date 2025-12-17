@@ -5,16 +5,17 @@ import pytest
 
 
 @pytest.mark.unit
-@pytest.mark.parametrize("video_id, expected_word_count, expected_extra", [
-    ("video-1", 10, {"foo": "bar"}),
-    ("video-2", 20, {"foo": "baz"}),
+@pytest.mark.parametrize("video_id, expected_word_count, expected_status, expected_extra", [
+    ("video-1", 10, "analyzed", {"foo": "bar"}),
+    ("video-2", 20, "analyzed", {"foo": "baz"}),
 ])
-def test_get_video_success(client, video_id, expected_word_count, expected_extra):
+def test_get_video_success(client, video_id, expected_word_count, expected_status, expected_extra):
     response = client.get(f"/videos/{video_id}")
     assert response.status_code == 200
     data = response.json()
     assert data["video_id"] == video_id
     assert data["word_count"] == expected_word_count
+    assert data["status"] == expected_status
     assert data["extra"] == expected_extra
 
 

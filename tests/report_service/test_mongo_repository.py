@@ -4,45 +4,63 @@ from src.report_service.mongo_repository import VideoSummary, MongoReportReposit
 
 @pytest.fixture
 def sample_documents():
-    return [
-        {
-            "video_id": "video-1",
-            "word_count": 10,
-            "extra": {"foo": "bar"}
-        },
-        {
-            "video_id": "video-2",
-            "word_count": 20,
-            "extra": {"foo": "baz"}
-        }
-    ]
+    return {
+        "analysis": [
+            {
+                "video_id": "video-1",
+                "word_count": 10,
+                "extra": {"foo": "bar"}
+            },
+            {
+                "video_id": "video-2",
+                "word_count": 20,
+                "extra": {"foo": "baz"}
+            }
+        ],
+        "videos": [
+            {
+                "video_id": "video-1",
+                "status": "analyzed"
+            },
+            {
+                "video_id": "video-2",
+                "status": "analyzed"
+            },
+            {
+                "video_id": "video-3",
+                "status": "uploaded"
+            }
+        ]
+    }
 
 
 @pytest.fixture
 def repository_with_data(mongo_client, sample_documents):
     db = mongo_client["therapy_analysis"]
-    col = db["analysis_results"]
-    col.insert_many(sample_documents)
+    db["analysis_results"].insert_many(sample_documents["analysis"])
+    db["videos"].insert_many(sample_documents["videos"])
     return MongoReportRepository(mongo_client)
 
 
 @pytest.mark.unit
-def test_should_list_all_videos_when_collection_has_documents(repository_with_data, sample_documents):
+def test_should_list_only_analyzed_videos(repository_with_data):
     videos = repository_with_data.list_videos()
     
     assert len(videos) == 2
-    assert all(isinstance(v, VideoSummary) for v in videos)
+    assert all(v.status == "analyzed" for v in videos)
+    assert {v.video_id for v in videos} == {"video-1", "video-2"}
 
 
 @pytest.mark.unit
-@pytest.mark.parametrize("video_id, expected_word_count, expected_extra", [
-    ("video-1", 10, {"foo": "bar"}),
-    ("video-2", 20, {"foo": "baz"}),
+@pytest.mark.parametrize("video_id, expected_word_count, expected_status, expected_extra", [
+    ("video-1", 10, "analyzed", {"foo": "bar"}),
+    ("video-2", 20, "analyzed", {"foo": "baz"}),
 ])
 def test_should_contain_correct_video_summaries(
     repository_with_data, 
     video_id, 
     expected_word_count, 
+    expected_status,
     expected_extra
 ):
     videos = repository_with_data.list_videos()
@@ -50,6 +68,7 @@ def test_should_contain_correct_video_summaries(
     
     assert video is not None
     assert video.word_count == expected_word_count
+    assert video.status == expected_status
     assert video.extra == expected_extra
 
 
@@ -68,6 +87,7 @@ def test_should_return_video_summary_when_video_exists(repository_with_data):
     assert video is not None
     assert video.video_id == "video-1"
     assert video.word_count == 10
+    assert video.status == "analyzed"
     assert video.extra == {"foo": "bar"}
 
 

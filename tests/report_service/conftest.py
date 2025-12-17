@@ -9,7 +9,7 @@ class FakeReportRepository(ReportRepository):
         self.videos = videos or []
     
     def list_videos(self) -> list[VideoSummary]:
-        return self.videos
+        return [v for v in self.videos if v.status == "analyzed"]
 
     def get_video(self, video_id: str) -> VideoSummary | None:
         return next((v for v in self.videos if v.video_id == video_id), None)
@@ -18,8 +18,8 @@ class FakeReportRepository(ReportRepository):
 @pytest.fixture
 def sample_videos() -> list[VideoSummary]:
     return [
-        VideoSummary(video_id="video-1", word_count=10, extra={"foo": "bar"}),
-        VideoSummary(video_id="video-2", word_count=20, extra={"foo": "baz"}),
+        VideoSummary(video_id="video-1", word_count=10, status="analyzed", extra={"foo": "bar"}),
+        VideoSummary(video_id="video-2", word_count=20, status="analyzed", extra={"foo": "baz"}),
     ]
 
 
