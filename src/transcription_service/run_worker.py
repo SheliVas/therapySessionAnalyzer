@@ -3,6 +3,7 @@ import time
 from pathlib import Path
 
 import pika.exceptions
+from pymongo import MongoClient
 
 from src.transcription_service.rabbitmq_consumer import (
     RabbitMQConsumerConfig,
@@ -10,7 +11,13 @@ from src.transcription_service.rabbitmq_consumer import (
 )
 from src.transcription_service.rabbitmq_publisher import RabbitMQTranscriptEventPublisher
 from src.transcription_service.domain import TranscriptionBackend, StorageClient
-from src.shared.config import TranscriptCreatedPublisherConfig
+from src.shared.config import (
+    TranscriptCreatedPublisherConfig,
+    AudioExtractedConsumerConfig,
+    MinIOConfig,
+)
+from src.shared.minio_storage import MinioStorage
+from src.shared.videos_repository import MongoVideosRepository
 
 
 class StubTranscriptionBackend(TranscriptionBackend):
@@ -20,17 +27,36 @@ class StubTranscriptionBackend(TranscriptionBackend):
         return f"[Stub transcript for {len(audio_bytes)} bytes]"
 
 
-class StubStorageClient:
-    """Stub storage client."""
-    def download_file(self, bucket: str, key: str) -> bytes:
-        return b"stub-audio-content"
+def create_production_app() -> dict:
+    """
+    Create production app with real dependencies wired together.
     
-    def upload_file(self, bucket: str, key: str, content: bytes) -> None:
-        print(f"Uploaded {len(content)} bytes to {bucket}/{key}")
+    Builds:
+    - MinioStorage from shared config
+    - MongoVideosRepository from MongoDB client
+    - RabbitMQ consumer and publisher configs
+    - RabbitMQAudioExtractedConsumer with all dependencies
+    
+    Returns:
+        Dictionary with storage_client, repository, publisher, and consumer.
+        
+    Raises:
+        KeyError: If required environment variables are missing.
+    """
+    minio_config = MinIOConfig(
+        endpoint=os.environ["MINIO_ENDPOINT"],
+        access_key=os.environ["MINIO_ACCESS_KEY"],
+        secret_key=os.environ["MINIO_SECRET_KEY"],
+        secure=os.environ.get("MINIO_SECURE", "false").lower() == "true",
+    )
+    storage_client = MinioStorage(minio_config)
 
+    mongo_uri = os.environ["MONGO_URI"]
+    mongo_db = os.environ["MONGO_DB"]
+    mongo_client = MongoClient(mongo_uri)
+    repository = MongoVideosRepository(mongo_client, mongo_db)
 
-def main() -> None:
-    consumer_config = RabbitMQConsumerConfig(
+    consumer_config = AudioExtractedConsumerConfig(
         host=os.environ["RABBITMQ_HOST"],
         port=int(os.environ["RABBITMQ_PORT"]),
         username=os.environ["RABBITMQ_USER"],
@@ -48,14 +74,25 @@ def main() -> None:
 
     publisher = RabbitMQTranscriptEventPublisher(publisher_config)
     backend = StubTranscriptionBackend()
-    storage_client = StubStorageClient()
-
     consumer = RabbitMQAudioExtractedConsumer(
         config=consumer_config,
         storage_client=storage_client,
         backend=backend,
+        repository=repository,
         publisher=publisher,
     )
+
+    return {
+        "storage_client": storage_client,
+        "repository": repository,
+        "publisher": publisher,
+        "consumer": consumer,
+    }
+
+
+def main() -> None:
+    app = create_production_app()
+    consumer = app["consumer"]
 
     max_retries = 10
     retry_delay = 2
