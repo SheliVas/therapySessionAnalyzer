@@ -9,4 +9,6 @@ pymongo
 mongomock
 pytest-mock
 assemblyai
+minio
+redis
 

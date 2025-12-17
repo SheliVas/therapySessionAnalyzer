@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from datetime import datetime
 from pathlib import Path
 from pymongo import MongoClient
+import logging
 
 from src.upload_service.domain import (
     VideoEventPublisher,
@@ -19,6 +20,9 @@ from src.shared.videos_repository import MongoVideosRepository
 class VideoUploadResponse(BaseModel):
     video_id: str
     filename: str
+
+
+logger = logging.getLogger("uvicorn")
 
 
 def create_production_app() -> FastAPI:
@@ -54,7 +58,9 @@ def create_app(
     )
     async def upload_video(file: UploadFile = File(...)) -> VideoUploadResponse:
         """Upload a video file and publish an event."""
+        logger.info(f"Received upload request for file: {file.filename}")
         content = await file.read()
+        logger.info(f"Read {len(content)} bytes")
         
         try:
             video_id = handle_video_upload(
@@ -65,8 +71,10 @@ def create_app(
                 content=content,
             )
         except ValueError as e:
+            logger.error(f"ValueError: {e}")
             raise HTTPException(status_code=400, detail=str(e))
-        except Exception:
+        except Exception as e:
+            logger.exception("An error occurred during video upload")
             raise HTTPException(status_code=500, detail="Service unavailable")
         
         return VideoUploadResponse(video_id=video_id, filename=file.filename)

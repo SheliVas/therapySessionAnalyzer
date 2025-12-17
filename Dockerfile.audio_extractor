@@ -2,10 +2,13 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
+# Install ffmpeg
+RUN apt-get update && apt-get install -y ffmpeg && rm -rf /var/lib/apt/lists/*
+
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY src ./src
 
 # We’ll just run the worker loop (no HTTP) for now
-CMD ["python", "-m", "src.audio_extractor_service.run_worker"]
+CMD ["python", "-u", "-m", "src.audio_extractor_service.run_worker"]

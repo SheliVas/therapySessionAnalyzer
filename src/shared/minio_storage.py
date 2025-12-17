@@ -1,4 +1,5 @@
 from minio import Minio
+import io
 
 from src.shared.config import MinIOConfig
 
@@ -39,7 +40,7 @@ class MinioStorage:
         self.client.put_object(
             bucket_name=bucket,
             object_name=key,
-            data=bytes(content),
+            data=io.BytesIO(content),
             length=len(content),
         )
     

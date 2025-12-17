@@ -1,4 +1,5 @@
 import json
+import logging
 
 import pika
 
@@ -9,6 +10,9 @@ from src.shared.config import AudioExtractedConsumerConfig
 
 
 RabbitMQConsumerConfig = AudioExtractedConsumerConfig
+
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
 
 
 class RabbitMQAudioExtractedConsumer:
@@ -42,18 +46,22 @@ class RabbitMQAudioExtractedConsumer:
         channel.queue_declare(queue=self._config.queue_name, durable=True)
 
         def _callback(ch, method, properties, body: bytes) -> None:
-            data = json.loads(body.decode("utf-8"))
-            event = AudioExtractedEvent(**data)
+            try:
+                data = json.loads(body.decode("utf-8"))
+                event = AudioExtractedEvent(**data)
 
-            process_audio_extracted_event(
-                event,
-                storage_client=self._storage_client,
-                backend=self._backend,
-                repository=self._repository,
-                publisher=self._publisher,
-            )
+                process_audio_extracted_event(
+                    event,
+                    storage_client=self._storage_client,
+                    backend=self._backend,
+                    repository=self._repository,
+                    publisher=self._publisher,
+                )
 
-            ch.basic_ack(delivery_tag=method.delivery_tag)
+                ch.basic_ack(delivery_tag=method.delivery_tag)
+            except Exception as e:
+                logger.exception(f"Error processing message: {e}")
+                ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
 
         channel.basic_consume(
             queue=self._config.queue_name,

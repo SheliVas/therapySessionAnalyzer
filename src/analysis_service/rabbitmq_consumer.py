@@ -1,5 +1,6 @@
 import json
 import time
+import logging
 
 import pika
 
@@ -14,6 +15,9 @@ from src.shared.config import TranscriptCreatedConsumerConfig
 
 
 RabbitMQConsumerConfig = TranscriptCreatedConsumerConfig
+
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
 
 
 class RabbitMQTranscriptCreatedConsumer:
@@ -71,19 +75,23 @@ class RabbitMQTranscriptCreatedConsumer:
         channel.queue_declare(queue=self._config.queue_name, durable=True)
 
         def _callback(ch, method, properties, body: bytes) -> None:
-            data = json.loads(body.decode("utf-8"))
-            event = TranscriptCreatedEvent(**data)
+            try:
+                data = json.loads(body.decode("utf-8"))
+                event = TranscriptCreatedEvent(**data)
 
-            process_transcript_created_event(
-                event,
-                backend=self._backend,
-                publisher=self._publisher,
-                repository=self._repository,
-                storage_client=self._storage_client,
-                videos_repository=self._videos_repository,
-            )
+                process_transcript_created_event(
+                    event,
+                    backend=self._backend,
+                    publisher=self._publisher,
+                    repository=self._repository,
+                    storage_client=self._storage_client,
+                    videos_repository=self._videos_repository,
+                )
 
-            ch.basic_ack(delivery_tag=method.delivery_tag)
+                ch.basic_ack(delivery_tag=method.delivery_tag)
+            except Exception as e:
+                logger.exception(f"Error processing message: {e}")
+                ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
 
         channel.basic_consume(
             queue=self._config.queue_name,
