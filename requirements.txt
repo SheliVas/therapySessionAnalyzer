@@ -8,4 +8,5 @@ pika
 pymongo
 mongomock
 pytest-mock
+assemblyai
 

@@ -11,20 +11,14 @@ from src.transcription_service.rabbitmq_consumer import (
 )
 from src.transcription_service.rabbitmq_publisher import RabbitMQTranscriptEventPublisher
 from src.transcription_service.domain import TranscriptionBackend, StorageClient
+from src.transcription_service.backend import AssemblyAITranscriptionBackend
+from src.transcription_service.config import load_config
 from src.shared.config import (
-    TranscriptCreatedPublisherConfig,
-    AudioExtractedConsumerConfig,
-    MinIOConfig,
+    get_minio_config,
+    get_mongo_config,
 )
 from src.shared.minio_storage import MinioStorage
 from src.shared.videos_repository import MongoVideosRepository
-
-
-class StubTranscriptionBackend(TranscriptionBackend):
-    """Stub backend that returns a placeholder transcript."""
-
-    def transcribe(self, audio_bytes: bytes) -> str:
-        return f"[Stub transcript for {len(audio_bytes)} bytes]"
 
 
 def create_production_app() -> dict:
@@ -43,39 +37,23 @@ def create_production_app() -> dict:
     Raises:
         KeyError: If required environment variables are missing.
     """
-    minio_config = MinIOConfig(
-        endpoint=os.environ["MINIO_ENDPOINT"],
-        access_key=os.environ["MINIO_ACCESS_KEY"],
-        secret_key=os.environ["MINIO_SECRET_KEY"],
-        secure=os.environ.get("MINIO_SECURE", "false").lower() == "true",
+    config = load_config()
+
+    storage_client = MinioStorage(get_minio_config())
+
+    mongo_config = get_mongo_config()
+    mongo_client = MongoClient(mongo_config.uri)
+    repository = MongoVideosRepository(mongo_client, mongo_config.db_name)
+
+    publisher = RabbitMQTranscriptEventPublisher(config.publisher)
+    
+    backend = AssemblyAITranscriptionBackend(
+        api_key=config.assemblyai_api_key,
+        base_url=config.assemblyai_base_url
     )
-    storage_client = MinioStorage(minio_config)
-
-    mongo_uri = os.environ["MONGO_URI"]
-    mongo_db = os.environ["MONGO_DB"]
-    mongo_client = MongoClient(mongo_uri)
-    repository = MongoVideosRepository(mongo_client, mongo_db)
-
-    consumer_config = AudioExtractedConsumerConfig(
-        host=os.environ["RABBITMQ_HOST"],
-        port=int(os.environ["RABBITMQ_PORT"]),
-        username=os.environ["RABBITMQ_USER"],
-        password=os.environ["RABBITMQ_PASS"],
-        queue_name=os.environ.get("AUDIO_EXTRACTED_QUEUE", "audio.extracted"),
-    )
-
-    publisher_config = TranscriptCreatedPublisherConfig(
-        host=os.environ["RABBITMQ_HOST"],
-        port=int(os.environ["RABBITMQ_PORT"]),
-        username=os.environ["RABBITMQ_USER"],
-        password=os.environ["RABBITMQ_PASS"],
-        queue_name=os.environ.get("TRANSCRIPT_CREATED_QUEUE", "transcript.created"),
-    )
-
-    publisher = RabbitMQTranscriptEventPublisher(publisher_config)
-    backend = StubTranscriptionBackend()
+    
     consumer = RabbitMQAudioExtractedConsumer(
-        config=consumer_config,
+        config=config.consumer,
         storage_client=storage_client,
         backend=backend,
         repository=repository,

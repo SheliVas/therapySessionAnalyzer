@@ -14,7 +14,8 @@ def test_should_use_correct_env_vars_in_transcription_production_app(mocker):
         "MINIO_ACCESS_KEY": "minio-access",
         "MINIO_SECRET_KEY": "minio-secret",
         "MONGO_URI": "mongodb://mongo:27017",
-        "MONGO_DB": "trans-db"
+        "MONGO_DB": "trans-db",
+        "ASSEMBLYAI_API_KEY": "test-key"
     })
     
     # Mock dependencies to avoid actual connections

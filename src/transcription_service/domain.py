@@ -6,6 +6,11 @@ from pydantic import BaseModel
 from src.audio_extractor_service.domain import AudioExtractedEvent
 
 
+class TranscriptionError(Exception):
+    """Base exception for transcription errors."""
+    pass
+
+
 class TranscriptCreatedEvent(BaseModel):
     video_id: str
     bucket: str

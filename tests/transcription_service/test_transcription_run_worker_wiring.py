@@ -24,6 +24,7 @@ def env_vars(monkeypatch):
     monkeypatch.setenv("MINIO_SECRET_KEY", "minioadmin")
     monkeypatch.setenv("MONGO_URI", "mongodb://localhost:27017")
     monkeypatch.setenv("MONGO_DB", "therapy_analysis")
+    monkeypatch.setenv("ASSEMBLYAI_API_KEY", "test-key")
     return {
         "RABBITMQ_HOST": "localhost",
         "RABBITMQ_PORT": "5672",
@@ -36,6 +37,7 @@ def env_vars(monkeypatch):
         "MINIO_SECRET_KEY": "minioadmin",
         "MONGO_URI": "mongodb://localhost:27017",
         "MONGO_DB": "therapy_analysis",
+        "ASSEMBLYAI_API_KEY": "test-key",
     }
 
 

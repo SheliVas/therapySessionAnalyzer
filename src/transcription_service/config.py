@@ -11,6 +11,8 @@ class TranscriptionConfig(BaseModel):
     consumer: RabbitMQConsumerConfig
     publisher: TranscriptCreatedRabbitMQConfig
     base_output_dir: Path
+    assemblyai_api_key: str
+    assemblyai_base_url: str = "https://api.assemblyai.com/v2"
 
 
 def load_config() -> TranscriptionConfig:
@@ -24,6 +26,9 @@ def load_config() -> TranscriptionConfig:
 
     base_output_dir_str = os.getenv("TRANSCRIPT_OUTPUT_BASE_DIR", "/app/data/transcripts")
     base_output_dir = Path(base_output_dir_str)
+
+    assemblyai_api_key = os.environ["ASSEMBLYAI_API_KEY"]
+    assemblyai_base_url = os.getenv("ASSEMBLYAI_BASE_URL", "https://api.assemblyai.com/v2")
 
     consumer_cfg = RabbitMQConsumerConfig(
         host=host,
@@ -45,4 +50,6 @@ def load_config() -> TranscriptionConfig:
         consumer=consumer_cfg,
         publisher=publisher_cfg,
         base_output_dir=base_output_dir,
+        assemblyai_api_key=assemblyai_api_key,
+        assemblyai_base_url=assemblyai_base_url,
     )
