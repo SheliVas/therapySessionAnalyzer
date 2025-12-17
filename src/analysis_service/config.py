@@ -14,6 +14,13 @@ class RedisConfig(BaseModel):
     ttl: int
 
 
+class LLMConfig(BaseModel):
+    api_key: Optional[str] = None
+    model: str = "gpt-5-mini"
+    base_url: str = "https://api.openai.com/v1"
+    timeout: float = 30.0
+
+
 class AnalysisServiceConfig(BaseModel):
     consumer: RabbitMQConsumerConfig
     publisher: AnalysisCompletedPublisherConfig
@@ -21,6 +28,7 @@ class AnalysisServiceConfig(BaseModel):
     mongo_db_name: str
     redis: RedisConfig
     llm_prompt_id: str
+    llm: LLMConfig
 
 
 def load_config() -> AnalysisServiceConfig:
@@ -42,6 +50,11 @@ def load_config() -> AnalysisServiceConfig:
     redis_ttl = int(os.getenv("REDIS_TTL", "3600"))
 
     llm_prompt_id = os.getenv("LLM_PROMPT_ID", "v1")
+
+    llm_api_key = os.getenv("LLM_API_KEY", None)
+    llm_model = os.getenv("LLM_MODEL", "gpt-5-mini")
+    llm_base_url = os.getenv("LLM_BASE_URL", "https://api.openai.com/v1")
+    llm_timeout = float(os.getenv("LLM_TIMEOUT", "30.0"))
 
     consumer_config = RabbitMQConsumerConfig(
         host=host,
@@ -67,6 +80,13 @@ def load_config() -> AnalysisServiceConfig:
         ttl=redis_ttl,
     )
 
+    llm_config = LLMConfig(
+        api_key=llm_api_key,
+        model=llm_model,
+        base_url=llm_base_url,
+        timeout=llm_timeout,
+    )
+
     return AnalysisServiceConfig(
         consumer=consumer_config,
         publisher=publisher_config,
@@ -74,4 +94,5 @@ def load_config() -> AnalysisServiceConfig:
         mongo_db_name=mongo_db_name,
         redis=redis_config,
         llm_prompt_id=llm_prompt_id,
+        llm=llm_config,
     )

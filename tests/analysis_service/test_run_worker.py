@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, patch
 from src.analysis_service.run_worker import main
 from src.analysis_service.llm_backend import LLMAnalysisBackend
 from src.analysis_service.redis_client import RedisClient
-from src.analysis_service.llm_client import StubLLMClient
+from src.analysis_service.llm_client import OpenAILLMClient
 
 @pytest.mark.unit
 def test_should_wire_with_llm_backend_and_redis(mocker):
@@ -20,7 +20,7 @@ def test_should_wire_with_llm_backend_and_redis(mocker):
     # Mock Redis and LLM Backend
     mock_redis_client_class = mocker.patch("src.analysis_service.run_worker.RedisClient")
     mock_llm_backend_class = mocker.patch("src.analysis_service.run_worker.LLMAnalysisBackend")
-    mock_llm_client_class = mocker.patch("src.analysis_service.run_worker.StubLLMClient")
+    mock_llm_client_factory = mocker.patch("src.analysis_service.run_worker.get_llm_client")
 
     # Setup config
     mock_config = MagicMock()
@@ -30,9 +30,12 @@ def test_should_wire_with_llm_backend_and_redis(mocker):
     mock_config.redis.password = "secret"
     mock_config.redis.ttl = 3600
     mock_config.llm_prompt_id = "v1"
+    mock_config.llm.api_key = "test-key"
+    mock_config.llm.model = "gpt-5-mini"
+    mock_config.llm.base_url = "https://api.openai.com/v1"
+    mock_config.llm.timeout = 30.0
     mock_load_config.return_value = mock_config
 
-    # Run main (it will call consumer.run_forever, so we need to mock that to return)
     mock_consumer.return_value.run_forever.side_effect = Exception("Stop execution")
     
     try:
@@ -41,7 +44,6 @@ def test_should_wire_with_llm_backend_and_redis(mocker):
         if str(e) != "Stop execution":
             raise e
 
-    # Assertions
     mock_redis_client_class.assert_called_once_with(
         host="redis-host",
         port=6379,
@@ -49,10 +51,15 @@ def test_should_wire_with_llm_backend_and_redis(mocker):
         password="secret"
     )
     
-    mock_llm_client_class.assert_called_once()
+    mock_llm_client_factory.assert_called_once_with(
+        api_key="test-key",
+        model="gpt-5-mini",
+        base_url="https://api.openai.com/v1",
+        timeout=30.0
+    )
     
     mock_llm_backend_class.assert_called_once_with(
-        llm_client=mock_llm_client_class.return_value,
+        llm_client=mock_llm_client_factory.return_value,
         redis_cache=mock_redis_client_class.return_value,
         cache_ttl_seconds=3600,
         prompt_id="v1"

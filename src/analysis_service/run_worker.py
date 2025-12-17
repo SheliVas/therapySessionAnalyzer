@@ -5,7 +5,7 @@ from src.analysis_service.mongo_repository import MongoAnalysisRepository
 from src.analysis_service.rabbitmq_consumer import RabbitMQTranscriptCreatedConsumer
 from src.analysis_service.rabbitmq_publisher import RabbitMQAnalysisEventPublisher
 from src.analysis_service.redis_client import RedisClient
-from src.analysis_service.llm_client import StubLLMClient
+from src.analysis_service.llm_client import get_llm_client
 from src.analysis_service.llm_backend import LLMAnalysisBackend
 from src.shared.minio_storage import MinioStorage
 from src.shared.videos_repository import MongoVideosRepository
@@ -27,7 +27,12 @@ def main() -> None:
         db=config.redis.db,
         password=config.redis.password,
     )
-    llm_client = StubLLMClient()
+    llm_client = get_llm_client(
+        api_key=config.llm.api_key,
+        model=config.llm.model,
+        base_url=config.llm.base_url,
+        timeout=config.llm.timeout,
+    )
     backend = LLMAnalysisBackend(
         llm_client=llm_client,
         redis_cache=redis_client,
