@@ -3,73 +3,7 @@ import mongomock
 from typing import Optional
 
 from src.upload_service.domain import VideoEventPublisher, VideoUploadedEvent
-
-
-class FakeVideoEventPublisher(VideoEventPublisher):
-    """Global fake publisher for upload service tests."""
-    def __init__(self) -> None:
-        self.published: list[VideoUploadedEvent] = []
-
-    def publish_video_uploaded(self, event: VideoUploadedEvent) -> None:
-        self.published.append(event)
-
-
-class FakeStorageClient:
-    """Shared fake StorageClient that records download/upload calls."""
-    def __init__(self) -> None:
-        self.download_response: Optional[bytes] = None
-        self.download_called_with: Optional[dict] = None
-        self.upload_called_with: Optional[dict] = None
-    
-    def set_download_response(self, content: bytes) -> None:
-        """Set the response for download_file calls."""
-        self.download_response = content
-    
-    def download_file(self, bucket: str, key: str) -> bytes:
-        """Record the call and return the set response."""
-        self.download_called_with = {"bucket": bucket, "key": key}
-        return self.download_response or b""
-    
-    def upload_file(self, bucket: str, key: str, content: bytes) -> None:
-        """Record the upload call."""
-        self.upload_called_with = {"bucket": bucket, "key": key, "content": content}
-
-
-class FakeVideosRepository:
-    """Unified fake repository for testing video status updates."""
-    def __init__(self) -> None:
-        self.mark_audio_extracted_calls: list[dict] = []
-        self.mark_transcribed_calls: list[dict] = []
-        self.mark_analyzed_calls: list[dict] = []
-        self.should_raise_error = False
-    
-    def mark_audio_extracted(self, video_id: str, audio_path: str) -> None:
-        """Record mark_audio_extracted call."""
-        self.mark_audio_extracted_calls.append({
-            "video_id": video_id,
-            "audio_path": audio_path,
-        })
-        if self.should_raise_error:
-            raise ValueError("Repository error")
-    
-    def mark_transcribed(self, video_id: str, transcript_path: str) -> None:
-        """Record mark_transcribed call."""
-        self.mark_transcribed_calls.append({
-            "video_id": video_id,
-            "transcript_path": transcript_path,
-        })
-        if self.should_raise_error:
-            raise ValueError("Repository error")
-    
-    def mark_analyzed(self, video_id: str, word_count: int) -> None:
-        """Record mark_analyzed call."""
-        self.mark_analyzed_calls.append({
-            "video_id": video_id,
-            "word_count": word_count,
-        })
-        if self.should_raise_error:
-            raise ValueError("Repository error")
-
+from tests.fakes import FakeVideoEventPublisher, FakeStorageClient, FakeVideosRepository
 
 @pytest.fixture
 def fake_video_publisher() -> FakeVideoEventPublisher:
@@ -87,6 +21,7 @@ def fake_storage_client() -> FakeStorageClient:
 def fake_videos_repository() -> FakeVideosRepository:
     """Global fixture for FakeVideosRepository."""
     return FakeVideosRepository()
+
 
 
 @pytest.fixture

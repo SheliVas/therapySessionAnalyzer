@@ -10,6 +10,7 @@ from src.analysis_service.worker import (
     AnalysisEventPublisher,
     AnalysisRepository,
 )
+from tests.fakes import FakeStorageClient
 
 
 class StorageClient(Protocol):
@@ -18,25 +19,6 @@ class StorageClient(Protocol):
 
     def upload_file(self, bucket: str, key: str, content: bytes) -> None:
         ...
-
-
-class FakeStorageClient:
-    def __init__(self) -> None:
-        self.files: Dict[str, bytes] = {}
-        self.upload_calls: list[tuple[str, str, bytes]] = []
-
-    def download_file(self, bucket: str, key: str) -> bytes:
-        path = f"{bucket}/{key}"
-        return self.files.get(path, b"")
-
-    def upload_file(self, bucket: str, key: str, content: bytes) -> None:
-        path = f"{bucket}/{key}"
-        self.files[path] = content
-        self.upload_calls.append((bucket, key, content))
-
-    def add_file(self, bucket: str, key: str, content: bytes) -> None:
-        path = f"{bucket}/{key}"
-        self.files[path] = content
 
 
 class FakeAnalysisBackend(AnalysisBackend):

@@ -6,8 +6,8 @@ from tests.analysis_service.conftest import (
     FakeAnalysisBackend,
     FakeAnalysisEventPublisher,
     FakeAnalysisRepository,
-    FakeStorageClient,
 )
+from tests.fakes import FakeStorageClient, FakeVideosRepository
 
 
 # --- Fixtures ---
@@ -27,8 +27,8 @@ def consumer_config() -> RabbitMQConsumerConfig:
 @pytest.fixture
 def fake_videos_repository_for_consumer():
     """Fake VideosRepository for consumer tests."""
-    from tests.conftest import FakeVideosRepository
     return FakeVideosRepository()
+
 
 
 # --- Unit Tests ---

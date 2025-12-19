@@ -2,7 +2,8 @@ import pytest
 
 from src.transcription_service.domain import TranscriptCreatedEvent
 from src.analysis_service.domain import analyze_transcript
-from tests.analysis_service.conftest import FakeAnalysisBackend, FakeStorageClient
+from tests.analysis_service.conftest import FakeAnalysisBackend
+from tests.fakes import FakeStorageClient
 
 
 def test_should_call_backend_analyze_once(

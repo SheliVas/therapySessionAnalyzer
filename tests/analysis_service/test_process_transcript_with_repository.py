@@ -7,8 +7,8 @@ from tests.analysis_service.conftest import (
     FakeAnalysisBackend,
     FakeAnalysisEventPublisher,
     FakeAnalysisRepository,
-    FakeStorageClient,
 )
+from tests.fakes import FakeStorageClient, FakeVideosRepository
 
 
 # --- Fixtures ---
@@ -16,8 +16,8 @@ from tests.analysis_service.conftest import (
 @pytest.fixture
 def fake_videos_repository_for_analysis():
     """Fake VideosRepository for analysis_service tests."""
-    from tests.conftest import FakeVideosRepository
     return FakeVideosRepository()
+
 
 
 # --- Unit Tests ---

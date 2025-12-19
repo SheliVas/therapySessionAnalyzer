@@ -13,9 +13,8 @@ from tests.analysis_service.conftest import (
     FakeAnalysisBackend,
     FakeAnalysisEventPublisher,
     FakeAnalysisRepository,
-    FakeStorageClient,
 )
-from tests.conftest import FakeVideosRepository
+from tests.fakes import FakeStorageClient, FakeVideosRepository
 
 
 # --- Fixtures ---
@@ -78,12 +77,12 @@ def started_consumer(
     fake_publisher: FakeAnalysisEventPublisher,
     fake_repository: FakeAnalysisRepository,
     fake_storage_client: FakeStorageClient,
+    fake_videos_repository: FakeVideosRepository,
     mock_channel,
     mock_pika,
 ) -> tuple[RabbitMQTranscriptCreatedConsumer, Any, Callable]:
     """Fixture that sets up and starts a consumer, returning the consumer, channel, and callback."""
     mock_channel.start_consuming.side_effect = KeyboardInterrupt
-    fake_videos_repository = FakeVideosRepository()
     
     consumer = RabbitMQTranscriptCreatedConsumer(
         config=config,
@@ -112,10 +111,10 @@ def test_should_connect_with_correct_parameters(
     fake_publisher: FakeAnalysisEventPublisher,
     fake_repository: FakeAnalysisRepository,
     fake_storage_client: FakeStorageClient,
+    fake_videos_repository: FakeVideosRepository,
     mock_channel,
     mock_pika,
 ):
-    fake_videos_repository = FakeVideosRepository()
     consumer = RabbitMQTranscriptCreatedConsumer(
         config=config,
         backend=fake_backend,
@@ -147,10 +146,10 @@ def test_should_declare_queue_durable(
     fake_publisher: FakeAnalysisEventPublisher,
     fake_repository: FakeAnalysisRepository,
     fake_storage_client: FakeStorageClient,
+    fake_videos_repository: FakeVideosRepository,
     mock_channel,
     mock_pika,
 ):
-    fake_videos_repository = FakeVideosRepository()
     consumer = RabbitMQTranscriptCreatedConsumer(
         config=config,
         backend=fake_backend,
@@ -268,6 +267,7 @@ def test_should_handle_malformed_message_gracefully(
     fake_publisher: FakeAnalysisEventPublisher,
     fake_repository: FakeAnalysisRepository,
     fake_storage_client: FakeStorageClient,
+    fake_videos_repository: FakeVideosRepository,
     mock_channel,
     mock_pika,
     invalid_body: bytes,
@@ -275,7 +275,6 @@ def test_should_handle_malformed_message_gracefully(
     mocker,
 ):
     mock_channel.start_consuming.side_effect = KeyboardInterrupt
-    fake_videos_repository = FakeVideosRepository()
     
     consumer = RabbitMQTranscriptCreatedConsumer(
         config=config,
