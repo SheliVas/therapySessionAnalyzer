@@ -1,9 +1,12 @@
 from abc import ABC, abstractmethod
+import logging
 
 from pydantic import BaseModel
 
 from src.transcription_service.domain import TranscriptCreatedEvent
 from src.analysis_service.domain import AnalysisBackend, analyze_transcript, StorageClient
+
+logger = logging.getLogger(__name__)
 
 
 class AnalysisCompletedEvent(BaseModel):
@@ -54,6 +57,7 @@ def process_transcript_created_event(
     Returns:
         The AnalysisCompletedEvent that was published and saved.
     """
+    logger.info("worker.process start video_id=%s", event.video_id)
     analysis_result = analyze_transcript(event, backend, storage_client)
     completed_event = AnalysisCompletedEvent(
         video_id=analysis_result.video_id,
@@ -62,7 +66,14 @@ def process_transcript_created_event(
     )
     
     videos_repository.mark_analyzed(analysis_result.video_id, analysis_result.word_count)
+    logger.info(
+        "worker.persisted video_id=%s word_count=%d",
+        analysis_result.video_id,
+        analysis_result.word_count,
+    )
     
     repository.save_analysis(completed_event)
+    logger.info("worker.analysis.saved video_id=%s", analysis_result.video_id)
     publisher.publish_analysis_completed(completed_event)
+    logger.info("worker.analysis.published video_id=%s", analysis_result.video_id)
     return completed_event

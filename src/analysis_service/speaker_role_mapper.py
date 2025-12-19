@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from typing import Any, Iterable
 
 from src.analysis_service.cache_keys import speaker_role_mapping_cache_key
@@ -12,6 +13,8 @@ from src.analysis_service.llm_prompts import (
     UTTERANCES_PLACEHOLDER,
 )
 from src.analysis_service.redis_cache import RedisCache
+
+logger = logging.getLogger(__name__)
 
 
 def _extract_speaker_labels(utterances: Iterable[dict[str, Any]]) -> list[str]:
@@ -45,6 +48,12 @@ def map_speakers_to_roles(
         raise ValueError("Exactly two speakers are required")
 
     cache_key = speaker_role_mapping_cache_key(utterances=utterances, prompt_id=prompt_id)
+    logger.info(
+        "speaker_roles.start prompt_id=%s labels=%s cache_key=%s",
+        prompt_id,
+        speaker_labels,
+        cache_key,
+    )
 
     def _call_llm() -> Any:
         prompt_text = _build_prompt(utterances=utterances)
@@ -53,10 +62,16 @@ def map_speakers_to_roles(
     def _validate(result: Any) -> dict[str, Any]:
         return validate_speaker_role_mapping_output(result, speaker_labels=speaker_labels)
 
-    return execute_cached_operation(
+    result = execute_cached_operation(
         cache=cache,
         cache_key=cache_key,
         ttl_seconds=ttl_seconds,
         operation=_call_llm,
         validator=_validate,
     )
+    logger.info(
+        "speaker_roles.completed prompt_id=%s labels=%s",
+        prompt_id,
+        speaker_labels,
+    )
+    return result

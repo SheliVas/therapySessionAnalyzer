@@ -1,5 +1,8 @@
+import logging
 from typing import TypeVar, Callable, Any, Optional
 from src.analysis_service.redis_cache import RedisCache
+
+logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
 
@@ -24,14 +27,17 @@ def execute_cached_operation(
     """
     cached = cache.get(cache_key)
     if cached is not None:
+        logger.info("cache.hit key=%s", cache_key)
         if validator:
             return validator(cached)
         return cached  # type: ignore
 
+    logger.info("cache.miss key=%s", cache_key)
     result = operation()
     
     if validator:
         result = validator(result)
         
     cache.set(cache_key, result, ttl_seconds)
+    logger.info("cache.store key=%s ttl=%d", cache_key, ttl_seconds)
     return result

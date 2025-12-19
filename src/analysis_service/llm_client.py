@@ -1,6 +1,11 @@
 import json
+import logging
+import time
+
 import httpx
 from typing import Protocol, Dict, Any, Optional
+
+logger = logging.getLogger(__name__)
 
 class LLMClient(Protocol):
     def analyze_transcript(self, transcript_text: str) -> Dict[str, Any]:
@@ -36,6 +41,8 @@ class OpenAILLMClient(LLMClient):
             "response_format": {"type": "json_object"}
         }
 
+        started_at = time.perf_counter()
+        logger.info("llm_client.request.start model=%s", self.model)
         with httpx.Client(timeout=self.timeout) as client:
             response = client.post(
                 f"{self.base_url}/chat/completions",
@@ -45,6 +52,12 @@ class OpenAILLMClient(LLMClient):
             response.raise_for_status()
             data = response.json()
             content = data["choices"][0]["message"]["content"]
+            logger.info(
+                "llm_client.request.success model=%s status=%s duration=%.2fs",
+                self.model,
+                response.status_code,
+                time.perf_counter() - started_at,
+            )
             return json.loads(content)
 
 def get_llm_client(api_key: Optional[str], model: str, base_url: str, timeout: float) -> LLMClient:

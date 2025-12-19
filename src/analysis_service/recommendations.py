@@ -1,4 +1,5 @@
 import json
+import logging
 from typing import Any, Set, Dict
 
 from src.analysis_service.cache_keys import therapist_recommendations_cache_key
@@ -11,6 +12,8 @@ from src.analysis_service.llm_prompts import (
     THERAPIST_RECOMMENDATIONS_USER_PROMPT_TEMPLATE,
     INPUT_JSON_PLACEHOLDER,
 )
+
+logger = logging.getLogger(__name__)
 
 def generate_therapist_recommendations(
     video_id: str,
@@ -28,6 +31,13 @@ def generate_therapist_recommendations(
             observed_topics.add(u["topic"])
         if "emotion" in u and u["emotion"]:
             observed_emotions.add(u["emotion"])
+    logger.info(
+        "recommendations.start video_id=%s utterances=%d topics=%d emotions=%d",
+        video_id,
+        len(utterances),
+        len(observed_topics),
+        len(observed_emotions),
+    )
 
     cache_key = therapist_recommendations_cache_key(
         video_id=video_id, utterances=utterances, prompt_id=prompt_id
@@ -50,10 +60,16 @@ def generate_therapist_recommendations(
     def _validate(data: Any) -> Dict[str, Any]:
         return validate_recommendations_output(data, valid_topics=observed_topics, valid_emotions=observed_emotions)
 
-    return execute_cached_operation(
+    result = execute_cached_operation(
         cache=cache,
         cache_key=cache_key,
         ttl_seconds=ttl_seconds,
         operation=_call_llm,
         validator=_validate,
     )
+    logger.info(
+        "recommendations.completed video_id=%s recommendations=%d",
+        video_id,
+        len(result.get("therapist_recommendations", [])),
+    )
+    return result

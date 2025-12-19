@@ -54,7 +54,7 @@ def load_config() -> AnalysisServiceConfig:
     llm_api_key = os.getenv("OPENAI_API_KEY") or os.getenv("LLM_API_KEY")
     llm_model = os.getenv("LLM_MODEL", "gpt-5-mini")
     llm_base_url = os.getenv("LLM_BASE_URL", "https://api.openai.com/v1")
-    llm_timeout = float(os.getenv("LLM_TIMEOUT", "30.0"))
+    llm_timeout = float(os.getenv("LLM_TIMEOUT", "6000.0"))
 
     consumer_config = RabbitMQConsumerConfig(
         host=host,

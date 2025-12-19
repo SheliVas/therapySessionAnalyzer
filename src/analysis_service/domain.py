@@ -1,9 +1,12 @@
 from abc import ABC, abstractmethod
+import logging
 from typing import Protocol
 
 from pydantic import BaseModel
 
 from src.transcription_service.domain import TranscriptCreatedEvent
+
+logger = logging.getLogger(__name__)
 
 
 class AnalysisResult(BaseModel):
@@ -40,7 +43,18 @@ def analyze_transcript(
     Returns:
         The AnalysisResult from the backend.
     """
+    logger.info(
+        "analysis.start event received video_id=%s bucket=%s key=%s",
+        event.video_id,
+        event.bucket,
+        event.key,
+    )
     transcript_bytes = storage_client.download_file(bucket=event.bucket, key=event.key)
+    logger.info(
+        "analysis.transcript.downloaded video_id=%s bytes=%d",
+        event.video_id,
+        len(transcript_bytes),
+    )
     transcript_text = transcript_bytes.decode("utf-8")
     
     result = backend.analyze(transcript_text, video_id=event.video_id)
@@ -51,4 +65,9 @@ def analyze_transcript(
             word_count=result.word_count,
             extra=result.extra,
         )
+    logger.info(
+        "analysis.completed video_id=%s word_count=%d",
+        result.video_id,
+        result.word_count,
+    )
     return result

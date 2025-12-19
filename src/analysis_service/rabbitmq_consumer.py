@@ -73,11 +73,17 @@ class RabbitMQTranscriptCreatedConsumer:
                 time.sleep(5)
         channel = connection.channel()
         channel.queue_declare(queue=self._config.queue_name, durable=True)
+        logger.info("rabbitmq.connected host=%s queue=%s", self._config.host, self._config.queue_name)
 
         def _callback(ch, method, properties, body: bytes) -> None:
             try:
                 data = json.loads(body.decode("utf-8"))
                 event = TranscriptCreatedEvent(**data)
+                logger.info(
+                    "rabbitmq.message.received delivery_tag=%s video_id=%s",
+                    method.delivery_tag,
+                    event.video_id,
+                )
 
                 process_transcript_created_event(
                     event,
@@ -89,6 +95,11 @@ class RabbitMQTranscriptCreatedConsumer:
                 )
 
                 ch.basic_ack(delivery_tag=method.delivery_tag)
+                logger.info(
+                    "rabbitmq.message.acknowledged delivery_tag=%s video_id=%s",
+                    method.delivery_tag,
+                    event.video_id,
+                )
             except Exception as e:
                 logger.exception(f"Error processing message: {e}")
                 ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)

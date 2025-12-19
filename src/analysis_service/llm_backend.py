@@ -1,5 +1,7 @@
 from typing import Dict, Any, List
 import json
+import logging
+import time
 
 from src.analysis_service.cache_keys import utterance_tagging_cache_key
 from src.analysis_service.cached_operation import execute_cached_operation
@@ -11,6 +13,8 @@ from src.analysis_service.llm_prompts import UTTERANCE_TAGGING_PROMPT_TEMPLATE, 
 from src.analysis_service.transcript_parser import parse_transcript
 from src.analysis_service.llm_output_validators import validate_utterance_tagging_output
 from src.analysis_service.recommendations import generate_therapist_recommendations
+
+logger = logging.getLogger(__name__)
 
 
 class LLMAnalysisBackend(AnalysisBackend):
@@ -46,10 +50,19 @@ class LLMAnalysisBackend(AnalysisBackend):
         Returns:
             AnalysisResult with word_count and extra containing utterances.
         """
+        started_at = time.perf_counter()
+        logger.info("llm_backend.analyze.start video_id=%s", video_id)
         word_count = len(transcript_text.split())
         utterances = parse_transcript(transcript_text)
+        logger.info(
+            "llm_backend.parsed video_id=%s utterances=%d word_count=%d",
+            video_id,
+            len(utterances),
+            word_count,
+        )
         
         if not utterances:
+            logger.info("llm_backend.no_utterances video_id=%s", video_id)
             return AnalysisResult(
                 video_id=video_id,
                 word_count=word_count,
@@ -63,6 +76,7 @@ class LLMAnalysisBackend(AnalysisBackend):
             prompt_id="speaker-role-mapping-v1", # Standard prompt ID for mapping
             ttl_seconds=self.cache_ttl_seconds
         )
+        logger.info("llm_backend.speaker_roles.mapped video_id=%s", video_id)
         speaker_roles = role_mapping_result["speaker_roles"]
 
         for utt in utterances:
@@ -70,6 +84,7 @@ class LLMAnalysisBackend(AnalysisBackend):
             utt["role"] = speaker_roles.get(label, {}).get("role", "unknown")
 
         tagged_utterances = self._tag_utterances(utterances)
+        logger.info("llm_backend.utterances.tagged video_id=%s", video_id)
         
         recommendations = generate_therapist_recommendations(
             video_id=video_id,
@@ -79,12 +94,19 @@ class LLMAnalysisBackend(AnalysisBackend):
             prompt_id=self.prompt_id,
             ttl_seconds=self.cache_ttl_seconds,
         )
+        logger.info(
+            "llm_backend.recommendations.generated video_id=%s count=%d",
+            video_id,
+            len(recommendations.get("therapist_recommendations", [])),
+        )
+        duration = time.perf_counter() - started_at
+        logger.info("llm_backend.analyze.completed video_id=%s duration=%.2fs", video_id, duration)
         
         return AnalysisResult(
             video_id=video_id,
             word_count=word_count,
             extra={
-                "utterances": tagged_utterances,
+                "utterances": tagged_utterances, # TODO: see if we only need patient utterances
                 "recommendations": recommendations,
             }
         )
@@ -92,6 +114,12 @@ class LLMAnalysisBackend(AnalysisBackend):
     def _tag_utterances(self, utterances: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Tag utterances with topic and emotion using LLM and caching."""
         cache_key = utterance_tagging_cache_key(utterances=utterances, prompt_id=self.prompt_id)
+        logger.info(
+            "llm_backend.tagging.start prompt_id=%s utterances=%d cache_key=%s",
+            self.prompt_id,
+            len(utterances),
+            cache_key,
+        )
         
         def _call_llm() -> Any:
             # Create a stable hash of the input utterances for caching
@@ -109,6 +137,7 @@ class LLMAnalysisBackend(AnalysisBackend):
             operation=_call_llm,
             validator=_validate,
         )
+        logger.info("llm_backend.tagging.completed prompt_id=%s", self.prompt_id)
         
         tagged_list = validated_result["utterances"]
         return self._merge_tags(utterances, tagged_list)
