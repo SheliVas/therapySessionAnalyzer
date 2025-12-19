@@ -2,7 +2,11 @@ import hashlib
 
 import pytest
 
-from src.analysis_service.cache_keys import llm_chunk_cache_key, speaker_role_mapping_cache_key
+from src.analysis_service.cache_keys import (
+    llm_chunk_cache_key,
+    speaker_role_mapping_cache_key,
+    utterance_tagging_cache_key,
+)
 
 
 # --- Fixtures ---
@@ -59,3 +63,18 @@ def test_speaker_role_mapping_cache_key_should_change_when_prompt_id_changes(
     key1 = speaker_role_mapping_cache_key(utterances=utterances_two_speakers, prompt_id="v1")
     key2 = speaker_role_mapping_cache_key(utterances=utterances_two_speakers, prompt_id="v2")
     assert key1 != key2
+
+
+@pytest.mark.unit
+def test_utterance_tagging_cache_key_should_match_sha256_of_payload(
+    utterances_two_speakers: list[dict[str, str]],
+) -> None:
+    prompt_id = "utterance-tagging-v1"
+
+    key = utterance_tagging_cache_key(utterances=utterances_two_speakers, prompt_id=prompt_id)
+
+    payload = {"prompt_id": prompt_id, "utterances": utterances_two_speakers}
+    expected_digest = hashlib.sha256(
+        __import__("json").dumps(payload, sort_keys=True, ensure_ascii=False).encode("utf-8")
+    ).hexdigest()
+    assert key == f"utterance_tagging:{expected_digest}"

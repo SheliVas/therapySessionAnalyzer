@@ -64,3 +64,31 @@ def validate_speaker_role_mapping_output(result: Any, *, speaker_labels: list[st
         raise ValueError("overall_confidence must be a number in [0,1]")
 
     return result
+
+
+def validate_utterance_tagging_output(result: Any, *, expected_length: int) -> dict[str, Any]:
+    """Validate strict JSON output for the utterance tagging prompt.
+
+    Raises ValueError for any schema/content violation.
+    Returns the validated dict (unchanged) on success.
+    """
+    if not isinstance(result, dict):
+        raise ValueError("LLM output must be a JSON object")
+
+    if "utterances" not in result:
+        raise ValueError("LLM output must contain 'utterances' key")
+
+    utterances = result["utterances"]
+    if not isinstance(utterances, list):
+        raise ValueError("'utterances' must be a list")
+
+    if len(utterances) != expected_length:
+        raise ValueError(f"LLM output length mismatch: expected {expected_length}, got {len(utterances)}")
+
+    for i, utt in enumerate(utterances):
+        if not isinstance(utt, dict):
+            raise ValueError(f"Utterance at index {i} must be an object")
+        if "topic" not in utt or "emotion" not in utt:
+            raise ValueError(f"Each utterance must have 'topic' and 'emotion' (failed at index {i})")
+
+    return result

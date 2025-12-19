@@ -28,6 +28,13 @@ def speaker_role_mapping_cache_key(*, utterances: list[dict[str, Any]], prompt_i
     return sha256_json_cache_key("speaker_role_mapping", payload)
 
 
+def utterance_tagging_cache_key(*, utterances: list[dict[str, Any]], prompt_id: str) -> str:
+    """Cache key for utterance tagging results."""
+
+    payload = {"prompt_id": prompt_id, "utterances": utterances}
+    return sha256_json_cache_key("utterance_tagging", payload)
+
+
 def llm_chunk_cache_key(*, chunk: str, prompt_id: str) -> str:
     """Cache key for LLM chunk analysis results.
 

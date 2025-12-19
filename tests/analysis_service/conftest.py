@@ -95,11 +95,17 @@ class FakeLLMClient(LLMClient):
         self.call_count = 0
         self.call_args: List[str] = []
         self.last_prompt: Optional[str] = None
+        self.side_effect: Optional[List[Dict[str, Any]]] = None
 
     def analyze_transcript(self, transcript_text: str) -> Dict[str, Any]:
         self.call_count += 1
         self.call_args.append(transcript_text)
         self.last_prompt = transcript_text
+        
+        if self.side_effect:
+            # Use pop(0) to simulate side_effect behavior
+            return self.side_effect.pop(0)
+            
         return self.return_value
 
 

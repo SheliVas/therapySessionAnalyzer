@@ -1,9 +1,15 @@
 from typing import Dict, Any, List
+import json
 
-from src.analysis_service.cache_keys import llm_chunk_cache_key
+from src.analysis_service.cache_keys import utterance_tagging_cache_key
+from src.analysis_service.cached_operation import execute_cached_operation
 from src.analysis_service.domain import AnalysisBackend, AnalysisResult
 from src.analysis_service.llm_client import LLMClient
 from src.analysis_service.redis_cache import RedisCache
+from src.analysis_service.speaker_role_mapper import map_speakers_to_roles
+from src.analysis_service.llm_prompts import UTTERANCE_TAGGING_PROMPT_TEMPLATE, UTTERANCES_PLACEHOLDER
+from src.analysis_service.transcript_parser import parse_transcript
+from src.analysis_service.llm_output_validators import validate_utterance_tagging_output
 
 
 class LLMAnalysisBackend(AnalysisBackend):
@@ -30,73 +36,74 @@ class LLMAnalysisBackend(AnalysisBackend):
         self.prompt_id = prompt_id
     
     def analyze(self, transcript_text: str) -> AnalysisResult:
-        """Analyze transcript with caching and emotion timeline.
+        """Analyze transcript with per-utterance tagging.
         
         Args:
             transcript_text: The transcript to analyze.
         
         Returns:
-            AnalysisResult with word_count and extra containing backend,
-            chunks, and emotion_timeline.
+            AnalysisResult with word_count and extra containing utterances.
         """
         word_count = len(transcript_text.split())
-        chunks = self._split_transcript(transcript_text)
+        utterances = parse_transcript(transcript_text)
         
-        chunk_results = []
-        for chunk in chunks:
-            cache_key = llm_chunk_cache_key(chunk=chunk, prompt_id=self.prompt_id)
-            cached_result = self.redis_cache.get(cache_key)
-            
-            if cached_result is not None:
-                result = cached_result
-            else:
-                result = self.llm_client.analyze_transcript(chunk)
-                self.redis_cache.set(cache_key, result, self.cache_ttl_seconds)
-            
-            chunk_results.append(result)
-        
-        emotion_timeline = self._derive_emotion_timeline(chunk_results)
+        if not utterances:
+            return AnalysisResult(
+                video_id="",
+                word_count=word_count,
+                extra={"utterances": []}
+            )
+
+        role_mapping_result = map_speakers_to_roles(
+            utterances=utterances,
+            llm_client=self.llm_client,
+            cache=self.redis_cache,
+            prompt_id="speaker-role-mapping-v1", # Standard prompt ID for mapping
+            ttl_seconds=self.cache_ttl_seconds
+        )
+        speaker_roles = role_mapping_result["speaker_roles"]
+
+        for utt in utterances:
+            label = utt["speaker_label"]
+            utt["role"] = speaker_roles.get(label, {}).get("role", "unknown")
+
+        tagged_utterances = self._tag_utterances(utterances)
         
         return AnalysisResult(
             video_id="",
             word_count=word_count,
             extra={
-                "backend": "llm",
-                "chunks": chunk_results,
-                "emotion_timeline": emotion_timeline,
+                "utterances": tagged_utterances,
             }
         )
-    
-    def _split_transcript(self, transcript_text: str) -> List[str]:
-        """Split transcript into chunks (by paragraphs/empty lines).
+
+    def _tag_utterances(self, utterances: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Tag utterances with topic and emotion using LLM and caching."""
+        cache_key = utterance_tagging_cache_key(utterances=utterances, prompt_id=self.prompt_id)
         
-        Args:
-            transcript_text: The transcript to split.
+        def _call_llm() -> Any:
+            # Create a stable hash of the input utterances for caching
+            utterances_json = json.dumps(utterances, sort_keys=True)
+            prompt = UTTERANCE_TAGGING_PROMPT_TEMPLATE.replace(UTTERANCES_PLACEHOLDER, utterances_json)
+            return self.llm_client.analyze_transcript(prompt)
+
+        def _validate(result: Any) -> Dict[str, Any]:
+            return validate_utterance_tagging_output(result, expected_length=len(utterances))
+
+        validated_result = execute_cached_operation(
+            cache=self.redis_cache,
+            cache_key=cache_key,
+            ttl_seconds=self.cache_ttl_seconds,
+            operation=_call_llm,
+            validator=_validate,
+        )
         
-        Returns:
-            List of non-empty chunks.
-        """
-        if not transcript_text.strip():
-            return []
-        
-        paragraphs = transcript_text.split('\n\n')
-        chunks = [p.strip() for p in paragraphs if p.strip()]
-        return chunks
-    
-    def _derive_emotion_timeline(self, chunk_results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Derive emotion timeline from chunk results.
-        
-        Args:
-            chunk_results: List of LLM results per chunk.
-        
-        Returns:
-            List of emotion timeline entries with emotion and chunk_index.
-        """
-        timeline = []
-        for idx, result in enumerate(chunk_results):
-            emotion = result.get("emotion", "neutral")
-            timeline.append({
-                "emotion": emotion,
-                "chunk_index": idx,
-            })
-        return timeline
+        tagged_list = validated_result["utterances"]
+        return self._merge_tags(utterances, tagged_list)
+
+    def _merge_tags(self, utterances: List[Dict[str, Any]], tags: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Merge tags into utterances."""
+        for utt, tag in zip(utterances, tags):
+            utt["topic"] = tag.get("topic", "other")
+            utt["emotion"] = tag.get("emotion", "neutral")
+        return utterances

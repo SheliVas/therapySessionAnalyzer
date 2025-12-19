@@ -4,6 +4,7 @@ import json
 from typing import Any, Iterable
 
 from src.analysis_service.cache_keys import speaker_role_mapping_cache_key
+from src.analysis_service.cached_operation import execute_cached_operation
 from src.analysis_service.llm_client import LLMClient
 from src.analysis_service.llm_output_validators import validate_speaker_role_mapping_output
 from src.analysis_service.llm_prompts import (
@@ -44,14 +45,18 @@ def map_speakers_to_roles(
         raise ValueError("Exactly two speakers are required")
 
     cache_key = speaker_role_mapping_cache_key(utterances=utterances, prompt_id=prompt_id)
-    cached = cache.get(cache_key)
-    if cached is not None:
-        return validate_speaker_role_mapping_output(cached, speaker_labels=speaker_labels)
 
-    prompt_text = _build_prompt(
-        utterances=utterances,
+    def _call_llm() -> Any:
+        prompt_text = _build_prompt(utterances=utterances)
+        return llm_client.analyze_transcript(prompt_text)
+
+    def _validate(result: Any) -> dict[str, Any]:
+        return validate_speaker_role_mapping_output(result, speaker_labels=speaker_labels)
+
+    return execute_cached_operation(
+        cache=cache,
+        cache_key=cache_key,
+        ttl_seconds=ttl_seconds,
+        operation=_call_llm,
+        validator=_validate,
     )
-    llm_result = llm_client.analyze_transcript(prompt_text)
-    validated = validate_speaker_role_mapping_output(llm_result, speaker_labels=speaker_labels)
-    cache.set(cache_key, validated, ttl_seconds)
-    return validated

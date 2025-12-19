@@ -28,16 +28,38 @@ def test_should_call_llm_on_cache_miss_and_skip_on_cache_hit(
     First call: cache misses trigger LLM calls and store results with TTL.
     Second call: cache hits skip LLM calls entirely.
     """
-    result1 = backend.analyze(sample_transcript)
+    # Mock transcript with Speaker labels to trigger parsing
+    transcript = "Speaker A: Hello\nSpeaker B: Hi"
+    
+    # Mock LLM responses for speaker mapping and utterance tagging
+    fake_llm_client.side_effect = [
+        # Speaker mapping
+        {
+            "speaker_roles": {
+                "Speaker A": {"role": "therapist", "confidence": 0.9, "reason": "test"},
+                "Speaker B": {"role": "patient", "confidence": 0.9, "reason": "test"}
+            },
+            "overall_confidence": 0.9
+        },
+        # Utterance tagging
+        {
+            "utterances": [
+                {"topic": "greeting", "emotion": "neutral"},
+                {"topic": "greeting", "emotion": "neutral"}
+            ]
+        }
+    ]
+
+    result1 = backend.analyze(transcript)
     first_call_count = fake_llm_client.call_count
-    assert first_call_count > 0
+    assert first_call_count == 2 # One for mapping, one for tagging
     
     assert len(fake_redis.cache) > 0
     for key, ttl in fake_redis.ttls.items():
         assert ttl == cache_ttl
     
     fake_llm_client.call_count = 0
-    result2 = backend.analyze(sample_transcript)
+    result2 = backend.analyze(transcript)
     second_call_count = fake_llm_client.call_count
     
     assert second_call_count == 0
@@ -46,99 +68,53 @@ def test_should_call_llm_on_cache_miss_and_skip_on_cache_hit(
 @pytest.mark.unit
 def test_should_include_word_count_in_result(
     backend: LLMAnalysisBackend,
-    sample_transcript: str,
+    fake_llm_client: FakeLLMClient,
 ) -> None:
     """word_count in AnalysisResult should match full transcript word count."""
-    result = backend.analyze(sample_transcript)
+    transcript = "Speaker A: Hello\nSpeaker B: Hi"
+    fake_llm_client.side_effect = [
+        {"speaker_roles": {"Speaker A": {"role": "therapist", "confidence": 0.9, "reason": "test"}, "Speaker B": {"role": "patient", "confidence": 0.9, "reason": "test"}}, "overall_confidence": 0.9},
+        {"utterances": [{"topic": "greeting", "emotion": "neutral"}, {"topic": "greeting", "emotion": "neutral"}]}
+    ]
+    result = backend.analyze(transcript)
     
-    expected_word_count = len(sample_transcript.split())
+    expected_word_count = len(transcript.split())
     assert result.word_count == expected_word_count
 
 
 @pytest.mark.unit
-def test_should_include_backend_llm_in_extra(
+def test_should_include_utterances_in_extra(
     backend: LLMAnalysisBackend,
-    sample_transcript: str,
+    fake_llm_client: FakeLLMClient,
 ) -> None:
-    """extra should contain backend="llm"."""
-    result = backend.analyze(sample_transcript)
-    
-    assert result.extra["backend"] == "llm"
-
-
-@pytest.mark.unit
-@pytest.mark.parametrize(
-    "extra_key,expected_type",
-    [
-        ("chunks", list),
-        ("emotion_timeline", list),
+    """extra should contain utterances."""
+    transcript = "Speaker A: Hello\nSpeaker B: Hi"
+    fake_llm_client.side_effect = [
+        {"speaker_roles": {"Speaker A": {"role": "therapist", "confidence": 0.9, "reason": "test"}, "Speaker B": {"role": "patient", "confidence": 0.9, "reason": "test"}}, "overall_confidence": 0.9},
+        {"utterances": [{"topic": "greeting", "emotion": "neutral"}, {"topic": "greeting", "emotion": "neutral"}]}
     ]
-)
-def test_extra_contains_required_keys_with_correct_types(
-    backend: LLMAnalysisBackend,
-    sample_transcript: str,
-    extra_key: str,
-    expected_type: type,
-) -> None:
-    """extra dict should contain required keys with correct types."""
-    result = backend.analyze(sample_transcript)
+    result = backend.analyze(transcript)
     
-    assert extra_key in result.extra
-    assert isinstance(result.extra[extra_key], expected_type)
-    assert len(result.extra[extra_key]) > 0
+    assert "utterances" in result.extra
+    assert len(result.extra["utterances"]) == 2
 
 
 @pytest.mark.unit
-def test_chunks_and_emotion_timeline_lengths_match_chunk_count(
+def test_extra_contains_utterances(
     backend: LLMAnalysisBackend,
-    sample_transcript: str,
+    fake_llm_client: FakeLLMClient,
 ) -> None:
-    """Chunks and emotion_timeline lengths should match the number of chunks."""
-    result = backend.analyze(sample_transcript)
-    chunks = backend._split_transcript(sample_transcript)
-    
-    assert len(result.extra["chunks"]) == len(chunks)
-    assert len(result.extra["emotion_timeline"]) == len(chunks)
-
-
-@pytest.mark.unit
-def test_emotion_timeline_entries_have_emotion_and_timestamp(
-    backend: LLMAnalysisBackend,
-    sample_transcript: str,
-) -> None:
-    """Each emotion_timeline entry should have emotion and chunk_index."""
-    result = backend.analyze(sample_transcript)
-    
-    for entry in result.extra["emotion_timeline"]:
-        assert "emotion" in entry
-        assert "chunk_index" in entry
-
-
-@pytest.mark.unit
-@pytest.mark.parametrize(
-    "transcript",
-    [
-        "Single line transcript.",
-        "Line one.\nLine two.\nLine three.",
-        """Multi-paragraph transcript.
-
-Second paragraph here.
-
-Third paragraph.""",
+    """extra dict should contain utterances."""
+    transcript = "Speaker A: Hello\nSpeaker B: Hi"
+    fake_llm_client.side_effect = [
+        {"speaker_roles": {"Speaker A": {"role": "therapist", "confidence": 0.9, "reason": "test"}, "Speaker B": {"role": "patient", "confidence": 0.9, "reason": "test"}}, "overall_confidence": 0.9},
+        {"utterances": [{"topic": "greeting", "emotion": "neutral"}, {"topic": "greeting", "emotion": "neutral"}]}
     ]
-)
-def test_should_split_transcript_into_non_empty_chunks(
-    backend: LLMAnalysisBackend,
-    transcript: str,
-) -> None:
-    """Transcript should be split into non-empty chunks."""
-    chunks = backend._split_transcript(transcript)
+    result = backend.analyze(transcript)
     
-    assert isinstance(chunks, list)
-    assert len(chunks) > 0
-    for chunk in chunks:
-        assert isinstance(chunk, str)
-        assert len(chunk.strip()) > 0
+    assert "utterances" in result.extra
+    assert isinstance(result.extra["utterances"], list)
+    assert len(result.extra["utterances"]) == 2
 
 
 @pytest.mark.unit
