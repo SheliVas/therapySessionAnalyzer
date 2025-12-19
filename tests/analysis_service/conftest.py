@@ -1,9 +1,10 @@
 import pytest
 from pathlib import Path
-from typing import Dict, Any, Protocol
+from typing import Dict, Any, Protocol, List, Optional
 from src.transcription_service.domain import TranscriptCreatedEvent
 from src.analysis_service.domain import AnalysisBackend, AnalysisResult
 from src.analysis_service.llm_client import LLMClient
+from src.analysis_service.redis_cache import RedisCache
 from src.analysis_service.worker import (
     AnalysisCompletedEvent,
     AnalysisEventPublisher,
@@ -69,12 +70,36 @@ class FakeAnalysisRepository(AnalysisRepository):
         self.saved_events.append(event)
 
 
+class FakeRedisCache(RedisCache):
+    """Unified Fake Redis cache for testing."""
+    def __init__(self) -> None:
+        self.cache: Dict[str, Any] = {}
+        self.ttls: Dict[str, int] = {}
+        self.last_get_key: Optional[str] = None
+        self.last_set: Optional[tuple[str, Any, int]] = None
+    
+    def get(self, key: str) -> Optional[Any]:
+        self.last_get_key = key
+        return self.cache.get(key)
+    
+    def set(self, key: str, value: Any, ttl_seconds: int) -> None:
+        self.cache[key] = value
+        self.ttls[key] = ttl_seconds
+        self.last_set = (key, value, ttl_seconds)
+
+
 class FakeLLMClient(LLMClient):
     """Fake LLM client for testing."""
     def __init__(self, return_value: Dict[str, Any]) -> None:
         self.return_value = return_value
+        self.call_count = 0
+        self.call_args: List[str] = []
+        self.last_prompt: Optional[str] = None
 
     def analyze_transcript(self, transcript_text: str) -> Dict[str, Any]:
+        self.call_count += 1
+        self.call_args.append(transcript_text)
+        self.last_prompt = transcript_text
         return self.return_value
 
 
@@ -116,9 +141,47 @@ def fake_repository() -> FakeAnalysisRepository:
 
 @pytest.fixture
 def fake_llm_result() -> Dict[str, Any]:
-    return {"summary": "short summary", "topics": ["topic1", "topic2"]}
+    return {"emotion": "neutral", "topic": "work"}
 
 
 @pytest.fixture
 def fake_llm_client(fake_llm_result: Dict[str, Any]) -> FakeLLMClient:
     return FakeLLMClient(return_value=fake_llm_result)
+
+
+@pytest.fixture
+def fake_redis() -> FakeRedisCache:
+    return FakeRedisCache()
+
+
+@pytest.fixture
+def utterances_two_speakers() -> List[Dict[str, str]]:
+    return [
+        {"speaker_label": "A", "text": "Hi, thanks for meeting today."},
+        {"speaker_label": "B", "text": "Of course. What feels most important?"},
+        {"speaker_label": "A", "text": "I have been anxious at work."},
+        {"speaker_label": "B", "text": "When did you first notice that anxiety?"},
+        {"speaker_label": "A", "text": "A few months ago after a reorg."},
+        {"speaker_label": "B", "text": "Let’s explore the thoughts that come up."},
+    ]
+
+
+@pytest.fixture
+def speaker_labels() -> List[str]:
+    return ["A", "B"]
+
+
+@pytest.fixture
+def sample_transcript() -> str:
+    return """The client arrived on time.
+They discussed their recent work stress.
+We explored coping mechanisms.
+
+The client felt heard and validated.
+They left feeling more hopeful."""
+
+
+@pytest.fixture
+def cache_ttl() -> int:
+    return 3600  # 1 hour
+

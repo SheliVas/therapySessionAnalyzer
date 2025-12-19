@@ -1,5 +1,6 @@
-import hashlib
 from typing import Dict, Any, List
+
+from src.analysis_service.cache_keys import llm_chunk_cache_key
 from src.analysis_service.domain import AnalysisBackend, AnalysisResult
 from src.analysis_service.llm_client import LLMClient
 from src.analysis_service.redis_cache import RedisCache
@@ -43,7 +44,7 @@ class LLMAnalysisBackend(AnalysisBackend):
         
         chunk_results = []
         for chunk in chunks:
-            cache_key = self._build_cache_key(chunk, prompt_id=self.prompt_id)
+            cache_key = llm_chunk_cache_key(chunk=chunk, prompt_id=self.prompt_id)
             cached_result = self.redis_cache.get(cache_key)
             
             if cached_result is not None:
@@ -81,20 +82,6 @@ class LLMAnalysisBackend(AnalysisBackend):
         paragraphs = transcript_text.split('\n\n')
         chunks = [p.strip() for p in paragraphs if p.strip()]
         return chunks
-    
-    def _build_cache_key(self, chunk: str, prompt_id: str) -> str:
-        """Build deterministic cache key from chunk and prompt_id.
-        
-        Args:
-            chunk: The chunk text.
-            prompt_id: The prompt version identifier.
-        
-        Returns:
-            The cache key.
-        """
-        combined = f"{chunk}:{prompt_id}"
-        hash_digest = hashlib.md5(combined.encode()).hexdigest()
-        return f"llm_chunk_{hash_digest}"
     
     def _derive_emotion_timeline(self, chunk_results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Derive emotion timeline from chunk results.

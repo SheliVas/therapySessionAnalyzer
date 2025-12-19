@@ -1,75 +1,17 @@
 import pytest
-from typing import Dict, Any, Optional
 from src.analysis_service.llm_backend import LLMAnalysisBackend
-from src.analysis_service.llm_client import LLMClient
-from src.analysis_service.redis_cache import RedisCache
-
-
-# --- Fakes ---
-
-class FakeRedisCache(RedisCache):
-    """Fake Redis cache for testing."""
-    def __init__(self) -> None:
-        self.cache: Dict[str, Any] = {}
-        self.ttls: Dict[str, int] = {}
-    
-    def get(self, key: str) -> Optional[Any]:
-        return self.cache.get(key)
-    
-    def set(self, key: str, value: Any, ttl_seconds: int) -> None:
-        self.cache[key] = value
-        self.ttls[key] = ttl_seconds
-
-
-class FakeLLMClientWithCallTracking(LLMClient):
-    """Fake LLM client that tracks calls."""
-    def __init__(self, return_value: Dict[str, Any]) -> None:
-        self.return_value = return_value
-        self.call_count = 0
-        self.call_args: list[str] = []
-    
-    def analyze_transcript(self, transcript_text: str) -> Dict[str, Any]:
-        self.call_count += 1
-        self.call_args.append(transcript_text)
-        return self.return_value
+from tests.analysis_service.conftest import FakeRedisCache, FakeLLMClient
 
 
 # --- Fixtures ---
 
 @pytest.fixture
-def fake_redis() -> FakeRedisCache:
-    return FakeRedisCache()
-
-
-@pytest.fixture
-def fake_llm_client() -> FakeLLMClientWithCallTracking:
-    return FakeLLMClientWithCallTracking(
-        return_value={"emotion": "calm", "summary": "client discussing work stress"}
-    )
-
-
-@pytest.fixture
-def cache_ttl() -> int:
-    return 3600  # 1 hour
-
-
-@pytest.fixture
-def backend(fake_redis: FakeRedisCache, fake_llm_client: FakeLLMClientWithCallTracking, cache_ttl: int) -> LLMAnalysisBackend:
+def backend(fake_redis: FakeRedisCache, fake_llm_client: FakeLLMClient, cache_ttl: int) -> LLMAnalysisBackend:
     return LLMAnalysisBackend(
         llm_client=fake_llm_client,
         redis_cache=fake_redis,
         cache_ttl_seconds=cache_ttl
     )
-
-
-@pytest.fixture
-def sample_transcript() -> str:
-    return """The client arrived on time.
-They discussed their recent work stress.
-We explored coping mechanisms.
-
-The client felt heard and validated.
-They left feeling more hopeful."""
 
 
 # --- Unit Tests ---
@@ -78,7 +20,7 @@ They left feeling more hopeful."""
 def test_should_call_llm_on_cache_miss_and_skip_on_cache_hit(
     backend: LLMAnalysisBackend,
     fake_redis: FakeRedisCache,
-    fake_llm_client: FakeLLMClientWithCallTracking,
+    fake_llm_client: FakeLLMClient,
     sample_transcript: str,
     cache_ttl: int,
 ) -> None:
@@ -99,33 +41,6 @@ def test_should_call_llm_on_cache_miss_and_skip_on_cache_hit(
     second_call_count = fake_llm_client.call_count
     
     assert second_call_count == 0
-
-
-@pytest.mark.unit
-@pytest.mark.parametrize(
-    "chunk1,chunk2,prompt1,prompt2,should_be_equal",
-    [
-        ("stress text", "stress text", "v1", "v1", True),
-        ("chunk1", "chunk2", "v1", "v1", False),
-        ("stress text", "stress text", "v1", "v2", False),
-    ]
-)
-def test_cache_key_determinism_and_uniqueness(
-    backend: LLMAnalysisBackend,
-    chunk1: str,
-    chunk2: str,
-    prompt1: str,
-    prompt2: str,
-    should_be_equal: bool,
-) -> None:
-    """Cache keys should be deterministic and unique based on chunk and prompt_id."""
-    key1 = backend._build_cache_key(chunk1, prompt_id=prompt1)
-    key2 = backend._build_cache_key(chunk2, prompt_id=prompt2)
-    
-    if should_be_equal:
-        assert key1 == key2
-    else:
-        assert key1 != key2
 
 
 @pytest.mark.unit
