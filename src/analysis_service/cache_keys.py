@@ -44,3 +44,11 @@ def llm_chunk_cache_key(*, chunk: str, prompt_id: str) -> str:
     combined = f"{chunk}:{prompt_id}"
     hash_digest = hashlib.md5(combined.encode()).hexdigest()
     return f"llm_chunk_{hash_digest}"
+
+
+def therapist_recommendations_cache_key(*, video_id: str, utterances: list[dict[str, Any]], prompt_id: str) -> str:
+    """Cache key for therapist recommendations."""
+
+    payload = {"prompt_id": prompt_id, "video_id": video_id, "utterances": utterances}
+    return sha256_json_cache_key("therapist_recommendations", payload)
+

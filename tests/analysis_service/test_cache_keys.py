@@ -6,6 +6,7 @@ from src.analysis_service.cache_keys import (
     llm_chunk_cache_key,
     speaker_role_mapping_cache_key,
     utterance_tagging_cache_key,
+    therapist_recommendations_cache_key,
 )
 
 
@@ -78,3 +79,22 @@ def test_utterance_tagging_cache_key_should_match_sha256_of_payload(
         __import__("json").dumps(payload, sort_keys=True, ensure_ascii=False).encode("utf-8")
     ).hexdigest()
     assert key == f"utterance_tagging:{expected_digest}"
+
+
+@pytest.mark.unit
+def test_therapist_recommendations_cache_key_should_match_sha256_of_payload(
+    utterances_two_speakers: list[dict[str, str]],
+) -> None:
+    prompt_id = "rec-v1"
+    video_id = "vid-123"
+
+    key = therapist_recommendations_cache_key(
+        video_id=video_id, utterances=utterances_two_speakers, prompt_id=prompt_id
+    )
+
+    payload = {"prompt_id": prompt_id, "video_id": video_id, "utterances": utterances_two_speakers}
+    expected_digest = hashlib.sha256(
+        __import__("json").dumps(payload, sort_keys=True, ensure_ascii=False).encode("utf-8")
+    ).hexdigest()
+    assert key == f"therapist_recommendations:{expected_digest}"
+

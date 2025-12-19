@@ -92,3 +92,56 @@ def validate_utterance_tagging_output(result: Any, *, expected_length: int) -> d
             raise ValueError(f"Each utterance must have 'topic' and 'emotion' (failed at index {i})")
 
     return result
+
+
+def validate_recommendations_output(data: Any, *, valid_topics: set[str], valid_emotions: set[str]) -> dict[str, Any]:
+    """Validate strict JSON output for the therapist recommendations prompt.
+
+    Raises ValueError for any schema/content violation.
+    Returns the validated dict (unchanged) on success.
+    """
+    if not isinstance(data, dict):
+        raise ValueError("Output must be a dictionary")
+    
+    if set(data.keys()) != {"therapist_recommendations"}:
+        raise ValueError("output keys must be exactly ['therapist_recommendations']")
+    
+    recs = data["therapist_recommendations"]
+    if not isinstance(recs, list):
+        raise ValueError("therapist_recommendations must be a list")
+        
+    if not (3 <= len(recs) <= 5):
+        raise ValueError(f"list length must be between 3 and 5, got {len(recs)}")
+        
+    valid_priorities = {"high", "medium", "low"}
+    required_item_keys = {"title", "rationale", "priority", "related_topics", "target_emotions"}
+    
+    for item in recs:
+        if not isinstance(item, dict):
+            raise ValueError("Recommendation item must be a dictionary")
+            
+        if set(item.keys()) != required_item_keys:
+            extra = set(item.keys()) - required_item_keys
+            if extra:
+                raise ValueError(f"extra keys found: {extra}")
+            raise ValueError(f"Item keys must be exactly {required_item_keys}")
+            
+        if item["priority"] not in valid_priorities:
+            raise ValueError(f"Invalid priority: {item['priority']}")
+            
+        if len(item["rationale"]) > 200:
+            raise ValueError("rationale must be <= 200 characters")
+            
+        if not isinstance(item["related_topics"], list):
+             raise ValueError("related_topics must be a list")
+        for topic in item["related_topics"]:
+            if topic not in valid_topics:
+                raise ValueError(f"related_topics contains topic not in input: {topic}")
+
+        if not isinstance(item["target_emotions"], list):
+             raise ValueError("target_emotions must be a list")
+        for emotion in item["target_emotions"]:
+            if emotion not in valid_emotions:
+                raise ValueError(f"target_emotions contains emotion not in input: {emotion}")
+    
+    return data

@@ -20,7 +20,7 @@ class StorageClient(Protocol):
 class AnalysisBackend(ABC):
 
     @abstractmethod
-    def analyze(self, transcript_text: str) -> AnalysisResult:
+    def analyze(self, transcript_text: str, video_id: str) -> AnalysisResult:
         """Analyze the given transcript text and return an AnalysisResult."""
         ...
 
@@ -43,7 +43,7 @@ def analyze_transcript(
     transcript_bytes = storage_client.download_file(bucket=event.bucket, key=event.key)
     transcript_text = transcript_bytes.decode("utf-8")
     
-    result = backend.analyze(transcript_text)
+    result = backend.analyze(transcript_text, video_id=event.video_id)
 
     if result.video_id != event.video_id:
         result = AnalysisResult(

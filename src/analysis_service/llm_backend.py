@@ -10,6 +10,7 @@ from src.analysis_service.speaker_role_mapper import map_speakers_to_roles
 from src.analysis_service.llm_prompts import UTTERANCE_TAGGING_PROMPT_TEMPLATE, UTTERANCES_PLACEHOLDER
 from src.analysis_service.transcript_parser import parse_transcript
 from src.analysis_service.llm_output_validators import validate_utterance_tagging_output
+from src.analysis_service.recommendations import generate_therapist_recommendations
 
 
 class LLMAnalysisBackend(AnalysisBackend):
@@ -35,11 +36,12 @@ class LLMAnalysisBackend(AnalysisBackend):
         self.cache_ttl_seconds = cache_ttl_seconds
         self.prompt_id = prompt_id
     
-    def analyze(self, transcript_text: str) -> AnalysisResult:
+    def analyze(self, transcript_text: str, video_id: str) -> AnalysisResult:
         """Analyze transcript with per-utterance tagging.
         
         Args:
             transcript_text: The transcript to analyze.
+            video_id: The ID of the video being analyzed.
         
         Returns:
             AnalysisResult with word_count and extra containing utterances.
@@ -49,7 +51,7 @@ class LLMAnalysisBackend(AnalysisBackend):
         
         if not utterances:
             return AnalysisResult(
-                video_id="",
+                video_id=video_id,
                 word_count=word_count,
                 extra={"utterances": []}
             )
@@ -69,11 +71,21 @@ class LLMAnalysisBackend(AnalysisBackend):
 
         tagged_utterances = self._tag_utterances(utterances)
         
+        recommendations = generate_therapist_recommendations(
+            video_id=video_id,
+            utterances=tagged_utterances,
+            llm_client=self.llm_client,
+            cache=self.redis_cache,
+            prompt_id=self.prompt_id,
+            ttl_seconds=self.cache_ttl_seconds,
+        )
+        
         return AnalysisResult(
-            video_id="",
+            video_id=video_id,
             word_count=word_count,
             extra={
                 "utterances": tagged_utterances,
+                "recommendations": recommendations,
             }
         )
 

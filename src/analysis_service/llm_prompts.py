@@ -4,6 +4,48 @@ Keep templates stable and reuse across modules.
 """
 
 UTTERANCES_PLACEHOLDER = "{{UTTERANCES_JSON}}"
+INPUT_JSON_PLACEHOLDER = "{{INPUT_JSON}}"
+
+THERAPIST_RECOMMENDATIONS_SYSTEM_PROMPT = (
+    "You generate next-session, technique-neutral therapist recommendations from tagged therapy-session utterances. "
+    "Follow instructions exactly. Output MUST be valid JSON and MUST match the provided schema exactly with no extra keys. "
+    "No diagnosis, no medication advice, no crisis instructions. Use ONLY evidence from provided utterances; do not invent facts. "
+    "Prioritize patient content and therapist missed opportunities."
+)
+
+THERAPIST_RECOMMENDATIONS_USER_PROMPT_TEMPLATE = (
+    "Input JSON:\n"
+    "{{INPUT_JSON}}\n\n"
+    "Requirements:\n"
+    "- Produce 3–5 recommendations.\n"
+    "- Output STRICT JSON only with this schema:\n"
+    "{{\n"
+    '  "therapist_recommendations": [\n'
+    "    {{\n"
+    '      "title": string,\n'
+    '      "rationale": string (≤200 characters),\n'
+    '      "priority": "high"|"medium"|"low",\n'
+    '      "related_topics": [string] (ONLY from utterances[].topic),\n'
+    '      "target_emotions": [string] (ONLY from utterances[].emotion)\n'
+    "    }}\n"
+    "  ]\n"
+    "}}\n"
+    "- Next-session focus: each recommendation must be a concrete action the therapist can take in the next session "
+    "(question to ask, exercise to run, structure to add, skill to practice, or summary to reflect).\n"
+    "- Technique-neutral wording (avoid naming modalities/acronyms).\n"
+    "- Non-identifying: no names, locations, unique life details; don’t quote long passages.\n"
+    "- Use only evidence from the utterances; no invented details.\n"
+    "- Enforce sets:\n"
+    "  - related_topics must be a subset of the input’s observed topics (utterances[].topic).\n"
+    "  - target_emotions must be a subset of the input’s observed emotions (utterances[].emotion).\n"
+    "- If evidence is thin, keep recommendations cautious and anchored to observed topics/emotions rather than guessing specifics.\n"
+    '- Do not include any keys beyond "therapist_recommendations".\n\n'
+    "Determinism notes (caller-side settings):\n"
+    "- temperature=0\n"
+    "- top_p=1\n"
+    "- (optional if supported) seed=fixed_number\n"
+    '- response_format={{"type":"json_object"}}'
+)
 
 SPEAKER_ROLE_MAPPING_PROMPT_TEMPLATE = (
     'RETURN ONLY JSON. NO MARKDOWN. NO PROSE. NO EXTRA KEYS.\n\n'

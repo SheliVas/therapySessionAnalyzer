@@ -47,19 +47,27 @@ def test_should_call_llm_on_cache_miss_and_skip_on_cache_hit(
                 {"topic": "greeting", "emotion": "neutral"},
                 {"topic": "greeting", "emotion": "neutral"}
             ]
+        },
+        # Recommendations
+        {
+            "therapist_recommendations": [
+                {"title": "Rec 1", "rationale": "Rationale 1", "priority": "high", "related_topics": ["greeting"], "target_emotions": ["neutral"]},
+                {"title": "Rec 2", "rationale": "Rationale 2", "priority": "medium", "related_topics": ["greeting"], "target_emotions": ["neutral"]},
+                {"title": "Rec 3", "rationale": "Rationale 3", "priority": "low", "related_topics": [], "target_emotions": []}
+            ]
         }
     ]
 
-    result1 = backend.analyze(transcript)
+    result1 = backend.analyze(transcript, video_id="v1")
     first_call_count = fake_llm_client.call_count
-    assert first_call_count == 2 # One for mapping, one for tagging
+    assert first_call_count == 3 # One for mapping, one for tagging, one for recommendations
     
     assert len(fake_redis.cache) > 0
     for key, ttl in fake_redis.ttls.items():
         assert ttl == cache_ttl
     
     fake_llm_client.call_count = 0
-    result2 = backend.analyze(transcript)
+    result2 = backend.analyze(transcript, video_id="v1")
     second_call_count = fake_llm_client.call_count
     
     assert second_call_count == 0
@@ -74,9 +82,10 @@ def test_should_include_word_count_in_result(
     transcript = "Speaker A: Hello\nSpeaker B: Hi"
     fake_llm_client.side_effect = [
         {"speaker_roles": {"Speaker A": {"role": "therapist", "confidence": 0.9, "reason": "test"}, "Speaker B": {"role": "patient", "confidence": 0.9, "reason": "test"}}, "overall_confidence": 0.9},
-        {"utterances": [{"topic": "greeting", "emotion": "neutral"}, {"topic": "greeting", "emotion": "neutral"}]}
+        {"utterances": [{"topic": "greeting", "emotion": "neutral"}, {"topic": "greeting", "emotion": "neutral"}]},
+        {"therapist_recommendations": [{"title": "t", "rationale": "r", "priority": "high", "related_topics": [], "target_emotions": []}] * 3}
     ]
-    result = backend.analyze(transcript)
+    result = backend.analyze(transcript, video_id="v1")
     
     expected_word_count = len(transcript.split())
     assert result.word_count == expected_word_count
@@ -91,9 +100,10 @@ def test_should_include_utterances_in_extra(
     transcript = "Speaker A: Hello\nSpeaker B: Hi"
     fake_llm_client.side_effect = [
         {"speaker_roles": {"Speaker A": {"role": "therapist", "confidence": 0.9, "reason": "test"}, "Speaker B": {"role": "patient", "confidence": 0.9, "reason": "test"}}, "overall_confidence": 0.9},
-        {"utterances": [{"topic": "greeting", "emotion": "neutral"}, {"topic": "greeting", "emotion": "neutral"}]}
+        {"utterances": [{"topic": "greeting", "emotion": "neutral"}, {"topic": "greeting", "emotion": "neutral"}]},
+        {"therapist_recommendations": [{"title": "t", "rationale": "r", "priority": "high", "related_topics": [], "target_emotions": []}] * 3}
     ]
-    result = backend.analyze(transcript)
+    result = backend.analyze(transcript, video_id="v1")
     
     assert "utterances" in result.extra
     assert len(result.extra["utterances"]) == 2
@@ -108,9 +118,10 @@ def test_extra_contains_utterances(
     transcript = "Speaker A: Hello\nSpeaker B: Hi"
     fake_llm_client.side_effect = [
         {"speaker_roles": {"Speaker A": {"role": "therapist", "confidence": 0.9, "reason": "test"}, "Speaker B": {"role": "patient", "confidence": 0.9, "reason": "test"}}, "overall_confidence": 0.9},
-        {"utterances": [{"topic": "greeting", "emotion": "neutral"}, {"topic": "greeting", "emotion": "neutral"}]}
+        {"utterances": [{"topic": "greeting", "emotion": "neutral"}, {"topic": "greeting", "emotion": "neutral"}]},
+        {"therapist_recommendations": [{"title": "t", "rationale": "r", "priority": "high", "related_topics": [], "target_emotions": []}] * 3}
     ]
-    result = backend.analyze(transcript)
+    result = backend.analyze(transcript, video_id="v1")
     
     assert "utterances" in result.extra
     assert isinstance(result.extra["utterances"], list)
@@ -130,8 +141,22 @@ def test_word_count_calculation(
     backend: LLMAnalysisBackend,
     transcript: str,
     expected_word_count: int,
+    fake_llm_client: FakeLLMClient,
 ) -> None:
     """Word count should be calculated correctly."""
-    result = backend.analyze(transcript)
+    # Need to mock side effects because analyze calls LLM
+    fake_llm_client.side_effect = [
+        {"speaker_roles": {}, "overall_confidence": 0.0}, # Mapping
+        {"utterances": []}, # Tagging
+        {"therapist_recommendations": [{"title": "t", "rationale": "r", "priority": "high", "related_topics": [], "target_emotions": []}] * 3} # Recs
+    ] * 3 # Repeat for each param case if needed, but actually parametrize runs separate tests.
+    # Wait, parametrize runs the test function multiple times.
+    # So side_effect needs to be set for each run.
+    
+    # However, if transcript is empty or no speakers, parse_transcript returns empty list.
+    # And analyze returns early.
+    # So LLM might not be called.
+    
+    result = backend.analyze(transcript, video_id="v1")
     
     assert result.word_count == expected_word_count

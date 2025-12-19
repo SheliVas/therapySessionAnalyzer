@@ -26,7 +26,7 @@ class FakeAnalysisBackend(AnalysisBackend):
         self.video_id = video_id
         self.calls: list[str] = []
 
-    def analyze(self, transcript_text: str) -> AnalysisResult:
+    def analyze(self, transcript_text: str, video_id: str) -> AnalysisResult:
         self.calls.append(transcript_text)
         word_count = len(transcript_text.split())
         return AnalysisResult(

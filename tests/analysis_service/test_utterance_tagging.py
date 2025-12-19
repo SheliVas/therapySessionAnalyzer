@@ -54,10 +54,18 @@ def test_should_parse_transcript_into_utterances_with_roles_topics_and_emotions(
                 {"topic": "feelings", "emotion": "anxious"},
                 {"topic": "exploration", "emotion": "empathetic"}
             ]
+        },
+        # Third call: recommendations
+        {
+            "therapist_recommendations": [
+                {"title": "Rec 1", "rationale": "Rationale 1", "priority": "high", "related_topics": ["greeting"], "target_emotions": ["neutral"]},
+                {"title": "Rec 2", "rationale": "Rationale 2", "priority": "medium", "related_topics": ["greeting"], "target_emotions": ["neutral"]},
+                {"title": "Rec 3", "rationale": "Rationale 3", "priority": "low", "related_topics": [], "target_emotions": []}
+            ]
         }
     ]
 
-    result = backend.analyze(sample_transcript)
+    result = backend.analyze(sample_transcript, video_id="v1")
 
     assert "utterances" in result.extra
     utterances = result.extra["utterances"]
@@ -111,7 +119,7 @@ def test_should_raise_value_error_when_llm_output_length_mismatches_input(
     ]
 
     with pytest.raises(ValueError, match="LLM output length mismatch"):
-        backend.analyze(sample_transcript)
+        backend.analyze(sample_transcript, video_id="v1")
 
 @pytest.mark.unit
 def test_should_use_cache_for_utterance_tagging(
@@ -125,6 +133,14 @@ def test_should_use_cache_for_utterance_tagging(
                 "Speaker B": {"role": "patient", "confidence": 0.9, "reason": "test"}
             },
             "overall_confidence": 0.9
+        },
+        # Recommendations (since tagging is cached, this is the next LLM call)
+        {
+            "therapist_recommendations": [
+                {"title": "Rec 1", "rationale": "Rationale 1", "priority": "high", "related_topics": ["greeting"], "target_emotions": ["neutral"]},
+                {"title": "Rec 2", "rationale": "Rationale 2", "priority": "medium", "related_topics": ["greeting"], "target_emotions": ["neutral"]},
+                {"title": "Rec 3", "rationale": "Rationale 3", "priority": "low", "related_topics": [], "target_emotions": []}
+            ]
         }
     ]
     
@@ -137,14 +153,15 @@ def test_should_use_cache_for_utterance_tagging(
                 {"topic": "feelings", "emotion": "anxious"},
                 {"topic": "exploration", "emotion": "empathetic"}
             ]
-        } # Cache hit for utterance tagging
+        }, # Cache hit for utterance tagging
+        None # Cache miss for recommendations
     ]
 
-    result = backend.analyze(sample_transcript)
+    result = backend.analyze(sample_transcript, video_id="v1")
 
     assert len(result.extra["utterances"]) == 3
-    # Verify LLM was only called once (for speaker mapping)
-    assert mock_llm_client.analyze_transcript.call_count == 1
+    # Verify LLM was called twice (mapping + recommendations)
+    assert mock_llm_client.analyze_transcript.call_count == 2
 
 @pytest.mark.unit
 def test_should_raise_value_error_when_llm_returns_invalid_format(
@@ -164,7 +181,7 @@ def test_should_raise_value_error_when_llm_returns_invalid_format(
     ]
 
     with pytest.raises(ValueError, match="LLM output must contain 'utterances' key"):
-        backend.analyze(sample_transcript)
+        backend.analyze(sample_transcript, video_id="v1")
 
 @pytest.mark.unit
 def test_should_handle_transcript_with_extra_whitespace_and_empty_lines(
@@ -186,8 +203,16 @@ def test_should_handle_transcript_with_extra_whitespace_and_empty_lines(
                 {"topic": "greeting", "emotion": "neutral"},
                 {"topic": "greeting", "emotion": "neutral"}
             ]
+        },
+        # Recommendations
+        {
+            "therapist_recommendations": [
+                {"title": "Rec 1", "rationale": "Rationale 1", "priority": "high", "related_topics": ["greeting"], "target_emotions": ["neutral"]},
+                {"title": "Rec 2", "rationale": "Rationale 2", "priority": "medium", "related_topics": ["greeting"], "target_emotions": ["neutral"]},
+                {"title": "Rec 3", "rationale": "Rationale 3", "priority": "low", "related_topics": [], "target_emotions": []}
+            ]
         }
     ]
 
-    result = backend.analyze(transcript)
+    result = backend.analyze(transcript, video_id="v1")
     assert len(result.extra["utterances"]) == 2
