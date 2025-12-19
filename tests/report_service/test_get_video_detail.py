@@ -6,8 +6,8 @@ import pytest
 
 @pytest.mark.unit
 @pytest.mark.parametrize("video_id, expected_word_count, expected_status, expected_extra", [
-    ("video-1", 10, "analyzed", {"foo": "bar"}),
-    ("video-2", 20, "analyzed", {"foo": "baz"}),
+    ("video-1", 10, "analyzed", {"foo": "bar", "recommendations": [{"title": "Rec 1", "priority": "high"}]}),
+    ("video-2", 20, "analyzed", {"foo": "baz", "recommendations": [{"title": "Rec 2", "priority": "low"}]}),
 ])
 def test_get_video_success(client, video_id, expected_word_count, expected_status, expected_extra):
     response = client.get(f"/videos/{video_id}")
@@ -17,6 +17,8 @@ def test_get_video_success(client, video_id, expected_word_count, expected_statu
     assert data["word_count"] == expected_word_count
     assert data["status"] == expected_status
     assert data["extra"] == expected_extra
+    assert "recommendations" in data["extra"]
+    assert data["extra"]["recommendations"] == expected_extra["recommendations"]
 
 
 @pytest.mark.unit
