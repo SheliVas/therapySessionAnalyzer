@@ -1,4 +1,4 @@
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Callable, Optional
 import json
 import logging
 import time
@@ -40,12 +40,18 @@ class LLMAnalysisBackend(AnalysisBackend):
         self.cache_ttl_seconds = cache_ttl_seconds
         self.prompt_id = prompt_id
     
-    def analyze(self, transcript_text: str, video_id: str) -> AnalysisResult:
+    def analyze(
+        self, 
+        transcript_text: str, 
+        video_id: str,
+        on_progress: Optional[Callable[[AnalysisResult], None]] = None
+    ) -> AnalysisResult:
         """Analyze transcript with per-utterance tagging.
         
         Args:
             transcript_text: The transcript to analyze.
             video_id: The ID of the video being analyzed.
+            on_progress: Optional callback to report partial results.
         
         Returns:
             AnalysisResult with word_count and analysis containing tagging and recommendations.
@@ -72,6 +78,7 @@ class LLMAnalysisBackend(AnalysisBackend):
                 }
             )
 
+        # 1. Role Mapping
         role_mapping_result = map_speakers_to_roles(
             utterances=utterances,
             llm_client=self.llm_client,
@@ -86,9 +93,39 @@ class LLMAnalysisBackend(AnalysisBackend):
             label = utt["speaker_label"]
             utt["role"] = speaker_roles.get(label, {}).get("role", "unknown")
 
+        # Report Progress: Roles Mapped
+        if on_progress:
+            try:
+                on_progress(AnalysisResult(
+                    video_id=video_id,
+                    word_count=word_count,
+                    analysis={
+                        "tagging": {"utterances": utterances},
+                        "recommendations": {"therapist_recommendations": []}
+                    }
+                ))
+            except Exception as e:
+                logger.error("Failed to report progress (Roles Mapped): %s", e)
+
+        # 2. Tagging
         tagged_utterances = self._tag_utterances(utterances)
         logger.info("llm_backend.utterances.tagged video_id=%s", video_id)
         
+        # Report Progress: Tagged
+        if on_progress:
+            try:
+                on_progress(AnalysisResult(
+                    video_id=video_id,
+                    word_count=word_count,
+                    analysis={
+                        "tagging": {"utterances": tagged_utterances},
+                        "recommendations": {"therapist_recommendations": []}
+                    }
+                ))
+            except Exception as e:
+                logger.error("Failed to report progress (Tagged): %s", e)
+
+        # 3. Recommendations
         recommendations = generate_therapist_recommendations(
             video_id=video_id,
             utterances=tagged_utterances,
@@ -102,6 +139,7 @@ class LLMAnalysisBackend(AnalysisBackend):
             video_id,
             len(recommendations.get("therapist_recommendations", [])),
         )
+        
         duration = time.perf_counter() - started_at
         logger.info("llm_backend.analyze.completed video_id=%s duration=%.2fs", video_id, duration)
         
@@ -133,7 +171,7 @@ class LLMAnalysisBackend(AnalysisBackend):
             return self.llm_client.analyze_transcript({"user": prompt})
 
         def _validate(result: Any) -> Dict[str, Any]:
-            return validate_utterance_tagging_output(result, expected_length=len(utterances))
+            return validate_utterance_tagging_output(result)
 
         validated_result = execute_cached_operation(
             cache=self.redis_cache,

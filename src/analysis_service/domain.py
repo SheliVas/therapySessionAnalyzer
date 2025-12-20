@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 import logging
+from typing import Callable, Optional
 
 from pydantic import BaseModel
 
@@ -43,8 +44,19 @@ class AnalysisRepository(ABC):
 class AnalysisBackend(ABC):
 
     @abstractmethod
-    def analyze(self, transcript_text: str, video_id: str) -> AnalysisResult:
-        """Analyze the given transcript text and return an AnalysisResult."""
+    def analyze(
+        self, 
+        transcript_text: str, 
+        video_id: str,
+        on_progress: Optional[Callable[[AnalysisResult], None]] = None
+    ) -> AnalysisResult:
+        """Analyze the given transcript text and return an AnalysisResult.
+        
+        Args:
+            transcript_text: The text to analyze.
+            video_id: The ID of the video.
+            on_progress: Optional callback to report partial results.
+        """
         ...
 
 
@@ -52,6 +64,7 @@ def analyze_transcript(
     event: TranscriptCreatedEvent,
     backend: AnalysisBackend,
     storage_client: StorageClient,
+    on_progress: Optional[Callable[[AnalysisResult], None]] = None,
 ) -> AnalysisResult:
     """Analyze a transcript from a TranscriptCreatedEvent.
 
@@ -59,6 +72,7 @@ def analyze_transcript(
         event: The TranscriptCreatedEvent containing the transcript bucket/key.
         backend: The analysis backend to use.
         storage_client: The storage client to download the transcript.
+        on_progress: Optional callback to report partial results.
 
     Returns:
         The AnalysisResult from the backend.
@@ -77,7 +91,11 @@ def analyze_transcript(
     )
     transcript_text = transcript_bytes.decode("utf-8")
     
-    result = backend.analyze(transcript_text, video_id=event.video_id)
+    result = backend.analyze(
+        transcript_text, 
+        video_id=event.video_id,
+        on_progress=on_progress
+    )
 
     if result.video_id != event.video_id:
         result = AnalysisResult(

@@ -7,6 +7,7 @@ from src.analysis_service.domain import (
     AnalysisCompletedEvent,
     AnalysisEventPublisher,
     AnalysisRepository,
+    AnalysisResult,
     analyze_transcript,
 )
 
@@ -35,7 +36,23 @@ def process_transcript_created_event(
         The AnalysisCompletedEvent that was published and saved.
     """
     logger.info("worker.process start video_id=%s", event.video_id)
-    analysis_result = analyze_transcript(event, backend, storage_client)
+    
+    def save_progress(result: AnalysisResult):
+        logger.info("worker.progress.saving video_id=%s", result.video_id)
+        completed_event = AnalysisCompletedEvent(
+            video_id=result.video_id,
+            word_count=result.word_count,
+            analysis=result.analysis,
+        )
+        repository.save_analysis(completed_event)
+
+    analysis_result = analyze_transcript(
+        event, 
+        backend, 
+        storage_client,
+        on_progress=save_progress
+    )
+    
     completed_event = AnalysisCompletedEvent(
         video_id=analysis_result.video_id,
         word_count=analysis_result.word_count,

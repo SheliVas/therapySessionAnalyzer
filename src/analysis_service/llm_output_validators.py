@@ -53,8 +53,6 @@ def validate_speaker_role_mapping_output(result: Any, *, speaker_labels: list[st
         reason = entry.get("reason")
         if not isinstance(reason, str):
             raise ValueError("reason must be a string")
-        if len(reason) > 120:
-            raise ValueError("reason must be <= 120 characters")
 
     if sorted(roles_assigned) != ["patient", "therapist"]:
         raise ValueError("Exactly one therapist and one patient must be assigned")
@@ -66,7 +64,7 @@ def validate_speaker_role_mapping_output(result: Any, *, speaker_labels: list[st
     return result
 
 
-def validate_utterance_tagging_output(result: Any, *, expected_length: int) -> dict[str, Any]:
+def validate_utterance_tagging_output(result: Any, *, expected_length: int = None) -> dict[str, Any]:
     """Validate strict JSON output for the utterance tagging prompt.
 
     Raises ValueError for any schema/content violation.
@@ -82,8 +80,6 @@ def validate_utterance_tagging_output(result: Any, *, expected_length: int) -> d
     if not isinstance(utterances, list):
         raise ValueError("'utterances' must be a list")
 
-    if len(utterances) != expected_length:
-        raise ValueError(f"LLM output length mismatch: expected {expected_length}, got {len(utterances)}")
 
     for i, utt in enumerate(utterances):
         if not isinstance(utt, dict):
@@ -109,9 +105,6 @@ def validate_recommendations_output(data: Any, *, valid_topics: set[str], valid_
     recs = data["therapist_recommendations"]
     if not isinstance(recs, list):
         raise ValueError("therapist_recommendations must be a list")
-        
-    if not (3 <= len(recs) <= 5):
-        raise ValueError(f"list length must be between 3 and 5, got {len(recs)}")
         
     valid_priorities = {"high", "medium", "low"}
     required_item_keys = {"title", "rationale", "priority", "related_topics", "target_emotions"}

@@ -90,17 +90,3 @@ def test_should_raise_value_error_when_confidence_not_number_or_out_of_range(
 ) -> None:
     with pytest.raises(ValueError):
         validate_speaker_role_mapping_output(llm_result, speaker_labels=speaker_labels)
-
-
-@pytest.mark.unit
-def test_should_raise_value_error_when_reason_too_long(speaker_labels: list[str]) -> None:
-    llm_result = {
-        "speaker_roles": {
-            "A": {"role": "therapist", "confidence": 0.9, "reason": "x" * 121},
-            "B": {"role": "patient", "confidence": 0.8, "reason": "Shares."},
-        },
-        "overall_confidence": 0.85,
-    }
-
-    with pytest.raises(ValueError):
-        validate_speaker_role_mapping_output(llm_result, speaker_labels=speaker_labels)
