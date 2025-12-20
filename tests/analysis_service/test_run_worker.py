@@ -31,7 +31,7 @@ def test_should_wire_with_llm_backend_and_redis(mocker):
     mock_config.llm.api_key = "test-key"
     mock_config.llm.model = "gemini-2.5-flash"
     mock_config.llm.base_url = "https://generativelanguage.googleapis.com"
-    mock_config.llm.timeout = 30.0
+    mock_config.llm.timeout = 180.0
     mock_load_config.return_value = mock_config
 
     mock_consumer.return_value.run_forever.side_effect = Exception("Stop execution")
@@ -53,7 +53,7 @@ def test_should_wire_with_llm_backend_and_redis(mocker):
         api_key="test-key",
         model="gemini-2.5-flash",
         base_url="https://generativelanguage.googleapis.com",
-        timeout=30.0
+        timeout=180.0
     )
     
     mock_llm_backend_class.assert_called_once_with(
