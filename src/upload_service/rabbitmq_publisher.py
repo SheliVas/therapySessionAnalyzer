@@ -1,5 +1,3 @@
-import json
-
 import pika
 
 from src.upload_service.domain import VideoUploadedEvent, VideoEventPublisher
@@ -33,6 +31,7 @@ class RabbitMQVideoEventPublisher(VideoEventPublisher):
                 exchange="",
                 routing_key=self._config.queue_name,
                 body=body,
+                properties=pika.BasicProperties(delivery_mode=2),
             )
         finally:
             connection.close()

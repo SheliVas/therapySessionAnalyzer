@@ -1,9 +1,9 @@
 from abc import ABC, abstractmethod
 import logging
-from typing import Protocol
 
 from pydantic import BaseModel
 
+from src.shared.protocols import StorageClient
 from src.transcription_service.domain import TranscriptCreatedEvent
 
 logger = logging.getLogger(__name__)
@@ -15,8 +15,28 @@ class AnalysisResult(BaseModel):
     analysis: dict = {}
 
 
-class StorageClient(Protocol):
-    def download_file(self, bucket: str, key: str) -> bytes:
+class AnalysisCompletedEvent(BaseModel):
+    """Event published when analysis is complete."""
+    video_id: str
+    word_count: int
+    analysis: dict = {}
+
+
+class AnalysisEventPublisher(ABC):
+    """Protocol for publishing analysis events."""
+
+    @abstractmethod
+    def publish_analysis_completed(self, event: "AnalysisCompletedEvent") -> None:
+        """Publish an AnalysisCompletedEvent."""
+        ...
+
+
+class AnalysisRepository(ABC):
+    """Protocol for persisting analysis results."""
+
+    @abstractmethod
+    def save_analysis(self, event: "AnalysisCompletedEvent") -> None:
+        """Save an AnalysisCompletedEvent to the repository."""
         ...
 
 

@@ -1,11 +1,10 @@
+from src.shared.protocols import StorageClient, VideosRepository
 from src.audio_extractor_service.domain import AudioExtractedEvent
 from src.transcription_service.domain import (
     TranscriptCreatedEvent,
     TranscriptionBackend,
     generate_transcript,
-    StorageClient,
     TranscriptEventPublisher,
-    VideosRepository,
 )
 
 

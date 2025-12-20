@@ -1,7 +1,5 @@
 import os
 import time
-from pathlib import Path
-from io import BytesIO
 
 import pika.exceptions
 from pymongo import MongoClient
@@ -9,43 +7,10 @@ from pymongo import MongoClient
 from src.audio_extractor_service.config import RabbitMQConsumerConfig
 from src.audio_extractor_service.rabbitmq_consumer import RabbitMQVideoUploadedConsumer
 from src.audio_extractor_service.rabbitmq_publisher import RabbitMQAudioEventPublisher
-from src.audio_extractor_service.domain import AudioConverter
+from src.audio_extractor_service.ffmpeg_converter import FFmpegAudioConverter
 from src.shared.config import MinIOConfig, AudioExtractedPublisherConfig
 from src.shared.minio_storage import MinioStorage
 from src.shared.videos_repository import MongoVideosRepository
-
-
-class FFmpegAudioConverter(AudioConverter):
-    """FFmpeg-based audio converter."""
-    
-    def convert(self, video_bytes: bytes) -> bytes:
-        """Convert video bytes to audio (MP3) using FFmpeg."""
-        try:
-            import subprocess
-            
-            input_file = BytesIO(video_bytes)
-            
-            process = subprocess.Popen(
-                [
-                    "ffmpeg",
-                    "-i", "pipe:0",
-                    "-q:a", "9",
-                    "-f", "mp3",
-                    "pipe:1",
-                ],
-                stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-            )
-            
-            audio_bytes, _ = process.communicate(input=video_bytes)
-            
-            if process.returncode != 0:
-                raise RuntimeError("FFmpeg conversion failed")
-            
-            return audio_bytes
-        except Exception as e:
-            raise RuntimeError(f"Audio conversion failed: {str(e)}") from e
 
 
 def create_production_app() -> dict:

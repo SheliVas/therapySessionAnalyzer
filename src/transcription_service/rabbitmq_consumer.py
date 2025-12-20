@@ -3,9 +3,10 @@ import logging
 
 import pika
 
+from src.shared.protocols import StorageClient, VideosRepository
 from src.audio_extractor_service.domain import AudioExtractedEvent
-from src.transcription_service.domain import TranscriptionBackend, StorageClient, VideosRepository
-from src.transcription_service.worker import TranscriptEventPublisher, process_audio_extracted_event
+from src.transcription_service.domain import TranscriptionBackend, TranscriptEventPublisher
+from src.transcription_service.worker import process_audio_extracted_event
 from src.shared.config import AudioExtractedConsumerConfig
 
 
@@ -44,6 +45,7 @@ class RabbitMQAudioExtractedConsumer:
         connection = pika.BlockingConnection(parameters)
         channel = connection.channel()
         channel.queue_declare(queue=self._config.queue_name, durable=True)
+        channel.basic_qos(prefetch_count=1)
 
         def _callback(ch, method, properties, body: bytes) -> None:
             try:

@@ -4,13 +4,10 @@ import logging
 
 import pika
 
+from src.shared.protocols import StorageClient, VideosRepository
 from src.transcription_service.domain import TranscriptCreatedEvent
-from src.analysis_service.domain import AnalysisBackend, StorageClient
-from src.analysis_service.worker import (
-    AnalysisEventPublisher,
-    AnalysisRepository,
-    process_transcript_created_event,
-)
+from src.analysis_service.domain import AnalysisBackend, AnalysisEventPublisher, AnalysisRepository
+from src.analysis_service.worker import process_transcript_created_event
 from src.shared.config import TranscriptCreatedConsumerConfig
 
 
@@ -29,7 +26,7 @@ class RabbitMQTranscriptCreatedConsumer:
         publisher: AnalysisEventPublisher,
         repository: AnalysisRepository,
         storage_client: StorageClient,
-        videos_repository,
+        videos_repository: VideosRepository,
     ) -> None:
         """Initialize the consumer.
 
@@ -73,6 +70,7 @@ class RabbitMQTranscriptCreatedConsumer:
                 time.sleep(5)
         channel = connection.channel()
         channel.queue_declare(queue=self._config.queue_name, durable=True)
+        channel.basic_qos(prefetch_count=1)
         logger.info("rabbitmq.connected host=%s queue=%s", self._config.host, self._config.queue_name)
 
         def _callback(ch, method, properties, body: bytes) -> None:

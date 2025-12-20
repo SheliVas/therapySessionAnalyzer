@@ -3,6 +3,7 @@ from typing import Protocol
 
 from pydantic import BaseModel
 
+from src.shared.protocols import StorageClient, VideosRepository
 from src.audio_extractor_service.domain import AudioExtractedEvent
 
 
@@ -17,32 +18,8 @@ class TranscriptCreatedEvent(BaseModel):
     key: str
 
 
-class StorageClient(Protocol):
-    def download_file(self, bucket: str, key: str) -> bytes:
-        ...
-
-    def upload_file(self, bucket: str, key: str, content: bytes) -> None:
-        ...
-
-
 class TranscriptEventPublisher(Protocol):
     def publish_transcript_created(self, event: TranscriptCreatedEvent) -> None:
-        ...
-
-
-class VideosRepository(Protocol):
-    """Protocol for managing video metadata status."""
-    
-    def mark_transcribed(self, video_id: str, transcript_path: str) -> None:
-        """Mark a video as transcribed and store the transcript path.
-        
-        Args:
-            video_id: Unique video identifier.
-            transcript_path: Path where the transcript is stored (bucket/key).
-            
-        Raises:
-            VideoNotFoundError: If the video does not exist.
-        """
         ...
 
 

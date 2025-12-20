@@ -1,9 +1,6 @@
-import json
-
 import pika
 
-from src.transcription_service.domain import TranscriptCreatedEvent
-from src.transcription_service.worker import TranscriptEventPublisher
+from src.transcription_service.domain import TranscriptCreatedEvent, TranscriptEventPublisher
 from src.shared.config import TranscriptCreatedPublisherConfig
 
 
@@ -29,12 +26,13 @@ class RabbitMQTranscriptEventPublisher(TranscriptEventPublisher):
 
             channel.queue_declare(queue=self._config.queue_name, durable=True)
 
-            body = json.dumps(event.model_dump()).encode("utf-8")
+            body = event.model_dump_json().encode("utf-8")
 
             channel.basic_publish(
                 exchange="",
                 routing_key=self._config.queue_name,
                 body=body,
+                properties=pika.BasicProperties(delivery_mode=2),
             )
         finally:
             connection.close()

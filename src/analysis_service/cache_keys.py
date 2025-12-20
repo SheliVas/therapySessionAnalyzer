@@ -36,14 +36,9 @@ def utterance_tagging_cache_key(*, utterances: list[dict[str, Any]], prompt_id: 
 
 
 def llm_chunk_cache_key(*, chunk: str, prompt_id: str) -> str:
-    """Cache key for LLM chunk analysis results.
-
-    Matches the previous behavior in LLMAnalysisBackend.
-    """
-
-    combined = f"{chunk}:{prompt_id}"
-    hash_digest = hashlib.md5(combined.encode()).hexdigest()
-    return f"llm_chunk_{hash_digest}"
+    """Cache key for LLM chunk analysis results."""
+    payload = {"prompt_id": prompt_id, "chunk": chunk}
+    return sha256_json_cache_key("llm_chunk", payload)
 
 
 def therapist_recommendations_cache_key(*, video_id: str, utterances: list[dict[str, Any]], prompt_id: str) -> str:

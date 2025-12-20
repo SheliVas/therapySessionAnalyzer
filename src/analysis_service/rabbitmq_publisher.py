@@ -1,8 +1,6 @@
-import json
-
 import pika
 
-from src.analysis_service.worker import AnalysisCompletedEvent, AnalysisEventPublisher
+from src.analysis_service.domain import AnalysisCompletedEvent, AnalysisEventPublisher
 from src.shared.config import AnalysisCompletedPublisherConfig
 
 
@@ -29,12 +27,13 @@ class RabbitMQAnalysisEventPublisher(AnalysisEventPublisher):
 
             channel.queue_declare(queue=self._config.queue_name, durable=True)
 
-            body = json.dumps(event.model_dump()).encode("utf-8")
+            body = event.model_dump_json().encode("utf-8")
 
             channel.basic_publish(
                 exchange="",
                 routing_key=self._config.queue_name,
                 body=body,
+                properties=pika.BasicProperties(delivery_mode=2),
             )
         finally:
             connection.close()

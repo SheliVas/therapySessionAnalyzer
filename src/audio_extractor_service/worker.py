@@ -1,9 +1,8 @@
+from src.shared.protocols import StorageClient, VideosRepository
 from src.upload_service.domain import VideoUploadedEvent
 from src.audio_extractor_service.domain import (
     AudioEventPublisher,
-    StorageClient,
     AudioConverter,
-    VideosRepository,
     handle_audio_extraction_event,
 )
 

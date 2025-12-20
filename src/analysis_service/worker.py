@@ -1,39 +1,16 @@
-from abc import ABC, abstractmethod
 import logging
 
-from pydantic import BaseModel
-
+from src.shared.protocols import StorageClient, VideosRepository
 from src.transcription_service.domain import TranscriptCreatedEvent
-from src.analysis_service.domain import AnalysisBackend, analyze_transcript, StorageClient
+from src.analysis_service.domain import (
+    AnalysisBackend,
+    AnalysisCompletedEvent,
+    AnalysisEventPublisher,
+    AnalysisRepository,
+    analyze_transcript,
+)
 
 logger = logging.getLogger(__name__)
-
-
-class AnalysisCompletedEvent(BaseModel):
-    video_id: str
-    word_count: int
-    analysis: dict = {}
-
-
-class AnalysisEventPublisher(ABC):
-    @abstractmethod
-    def publish_analysis_completed(self, event: AnalysisCompletedEvent) -> None:
-        """Publish an AnalysisCompletedEvent."""
-        ...
-
-
-class AnalysisRepository(ABC):
-    @abstractmethod
-    def save_analysis(self, event: AnalysisCompletedEvent) -> None:
-        """Save an AnalysisCompletedEvent to the repository."""
-        ...
-
-
-class VideosRepository(ABC):
-    @abstractmethod
-    def mark_analyzed(self, video_id: str, word_count: int) -> None:
-        """Mark a video as analyzed with word count."""
-        ...
 
 
 def process_transcript_created_event(

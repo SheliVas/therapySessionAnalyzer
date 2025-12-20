@@ -1,4 +1,4 @@
-from src.analysis_service.worker import AnalysisCompletedEvent
+from src.analysis_service.domain import AnalysisCompletedEvent
 
 
 class MongoAnalysisRepository:

@@ -1,6 +1,9 @@
 import os
 
-from src.shared.config import MinIOConfig, get_minio_config, MongoConfig, get_mongo_config, VideoUploadedPublisherConfig
+from src.shared.config import MongoConfig, VideoUploadedPublisherConfig
+
+# Re-export get_mongo_config from shared for backward compatibility
+from src.shared.config import get_mongo_config, get_minio_config  # noqa: F401
 
 
 def get_rabbitmq_config() -> VideoUploadedPublisherConfig:
@@ -16,14 +19,4 @@ def get_rabbitmq_config() -> VideoUploadedPublisherConfig:
         username=user,
         password=password,
         queue_name=queue_name,
-    )
-
-
-def get_mongo_config() -> MongoConfig:
-    uri = os.getenv("MONGO_URI", "mongodb://localhost:27017")
-    db_name = os.getenv("MONGO_DB", "therapy_analysis")
-    
-    return MongoConfig(
-        uri=uri,
-        db_name=db_name,
     )

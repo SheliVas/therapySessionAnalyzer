@@ -1,24 +1,17 @@
 import pytest
-from pathlib import Path
-from typing import Dict, Any, Protocol, List, Optional
+from typing import Dict, Any, List, Optional
+
 from src.transcription_service.domain import TranscriptCreatedEvent
-from src.analysis_service.domain import AnalysisBackend, AnalysisResult
-from src.analysis_service.llm_client import LLMClient
-from src.analysis_service.redis_cache import RedisCache
-from src.analysis_service.worker import (
+from src.analysis_service.domain import (
+    AnalysisBackend,
+    AnalysisResult,
     AnalysisCompletedEvent,
     AnalysisEventPublisher,
     AnalysisRepository,
 )
+from src.analysis_service.llm_client import LLMClient
+from src.analysis_service.redis_cache import RedisCache
 from tests.fakes import FakeStorageClient
-
-
-class StorageClient(Protocol):
-    def download_file(self, bucket: str, key: str) -> bytes:
-        ...
-
-    def upload_file(self, bucket: str, key: str, content: bytes) -> None:
-        ...
 
 
 class FakeAnalysisBackend(AnalysisBackend):
@@ -161,12 +154,13 @@ def speaker_labels() -> List[str]:
 
 @pytest.fixture
 def sample_transcript() -> str:
-    return """The client arrived on time.
-They discussed their recent work stress.
-We explored coping mechanisms.
-
-The client felt heard and validated.
-They left feeling more hopeful."""
+    """Sample transcript in the format expected by parse_transcript (Speaker: text)."""
+    return """Speaker A: Hi, thanks for meeting today.
+Speaker B: Of course. What feels most important to discuss?
+Speaker A: I've been anxious at work lately.
+Speaker B: When did you first notice that anxiety?
+Speaker A: A few months ago after the reorg.
+Speaker B: Let's explore the thoughts that come up."""
 
 
 @pytest.fixture

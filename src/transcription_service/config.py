@@ -1,5 +1,4 @@
 import os
-from pathlib import Path
 
 from pydantic import BaseModel
 
@@ -8,9 +7,9 @@ from src.shared.config import TranscriptCreatedRabbitMQConfig
 
 
 class TranscriptionConfig(BaseModel):
+    """Configuration for the transcription service."""
     consumer: RabbitMQConsumerConfig
     publisher: TranscriptCreatedRabbitMQConfig
-    base_output_dir: Path
     assemblyai_api_key: str
     assemblyai_base_url: str = "https://api.assemblyai.com"
 
@@ -24,11 +23,7 @@ def load_config() -> TranscriptionConfig:
     audio_extracted_queue = os.getenv("AUDIO_EXTRACTED_QUEUE", "audio.extracted")
     transcript_created_queue = os.getenv("TRANSCRIPT_CREATED_QUEUE", "transcript.created")
 
-    base_output_dir_str = os.getenv("TRANSCRIPT_OUTPUT_BASE_DIR", "/app/data/transcripts")
-    base_output_dir = Path(base_output_dir_str)
-
     assemblyai_api_key = os.environ["ASSEMBLYAI_API_KEY"]
-    # Set base URL to root, as the library might append /v2
     assemblyai_base_url = os.getenv("ASSEMBLYAI_BASE_URL", "https://api.assemblyai.com")
 
     consumer_cfg = RabbitMQConsumerConfig(
@@ -50,7 +45,6 @@ def load_config() -> TranscriptionConfig:
     return TranscriptionConfig(
         consumer=consumer_cfg,
         publisher=publisher_cfg,
-        base_output_dir=base_output_dir,
         assemblyai_api_key=assemblyai_api_key,
         assemblyai_base_url=assemblyai_base_url,
     )

@@ -3,12 +3,11 @@ import logging
 
 import pika
 
+from src.shared.protocols import StorageClient, VideosRepository
 from src.upload_service.domain import VideoUploadedEvent
 from src.audio_extractor_service.domain import (
     AudioEventPublisher,
-    StorageClient,
     AudioConverter,
-    VideosRepository,
 )
 from src.audio_extractor_service.worker import process_video_uploaded_event
 from src.shared.config import VideoUploadedConsumerConfig
@@ -49,6 +48,7 @@ class RabbitMQVideoUploadedConsumer:
         connection = pika.BlockingConnection(parameters)
         channel = connection.channel()
         channel.queue_declare(queue=self._config.queue_name, durable=True)
+        channel.basic_qos(prefetch_count=1)
 
         def _callback(ch, method, properties, body: bytes) -> None:
             try:

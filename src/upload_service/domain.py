@@ -5,6 +5,8 @@ import re
 
 from pydantic import BaseModel
 
+from src.shared.protocols import StorageClient, VideosRepository
+
 
 class VideoUploadedEvent(BaseModel):
     video_id: str
@@ -17,35 +19,6 @@ class VideoUploadedEvent(BaseModel):
 class VideoEventPublisher(Protocol):
     def publish_video_uploaded(self, event: VideoUploadedEvent) -> None:
         return
-
-
-class StorageClient(Protocol):
-    """Protocol for file storage operations."""
-    
-    def upload_file(self, bucket: str, key: str, content: bytes) -> None:
-        """Upload a file to storage."""
-        ...
-
-
-class VideosRepository(Protocol):
-    """Protocol for persisting video metadata."""
-    
-    def upsert_on_upload(
-        self,
-        video_id: str,
-        filename: str,
-        storage_path: str,
-        uploaded_at: datetime,
-    ) -> None:
-        """Upsert video metadata on upload.
-        
-        Args:
-            video_id: Unique video identifier.
-            filename: Original filename.
-            storage_path: Storage location (bucket/key).
-            uploaded_at: Upload timestamp.
-        """
-        ...
 
 
 def sanitize_filename(filename: str) -> str:

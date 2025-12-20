@@ -2,40 +2,13 @@ from typing import Protocol
 
 from pydantic import BaseModel
 
+from src.shared.protocols import StorageClient, VideosRepository
 from src.upload_service.domain import VideoUploadedEvent
-
-
-class StorageClient(Protocol):
-    """Protocol for storage client (MinIO, S3, etc.)."""
-    
-    def download_file(self, bucket: str, key: str) -> bytes:
-        """Download file from storage."""
-        ...
-    
-    def upload_file(self, bucket: str, key: str, content: bytes) -> None:
-        """Upload file to storage."""
-        ...
-
-
-class VideosRepository(Protocol):
-    """Protocol for managing video metadata status."""
-    
-    def mark_audio_extracted(self, video_id: str, audio_path: str) -> None:
-        """Mark a video as having audio extracted and store the audio path.
-        
-        Args:
-            video_id: Unique video identifier.
-            audio_path: Path where the extracted audio is stored (bucket/key).
-            
-        Raises:
-            VideoNotFoundError: If the video does not exist.
-        """
-        ...
 
 
 class AudioConverter(Protocol):
     """Protocol for audio conversion."""
-    
+
     def convert(self, video_bytes: bytes) -> bytes:
         """Convert video bytes to audio bytes."""
         ...
