@@ -193,7 +193,7 @@ def test_should_process_message_and_call_backend(
 
 
 @pytest.mark.unit
-def test_should_save_exactly_one_event_after_processing(
+def test_should_save_at_least_one_event_after_processing(
     started_consumer: tuple,
     fake_repository: FakeAnalysisRepository,
     message_body: bytes,
@@ -208,8 +208,8 @@ def test_should_save_exactly_one_event_after_processing(
 
     callback(mock_channel, fake_method, None, message_body)
 
-    assert len(fake_repository.saved_events) == 1
-    event = fake_repository.saved_events[0]
+    assert len(fake_repository.saved_events) >= 1
+    event = fake_repository.saved_events[-1]
     assert event.video_id == video_id
     assert event.word_count == 3
 

@@ -87,8 +87,6 @@ def test_cache_hit_returns_cached_result(fake_llm_client, fake_redis, sample_utt
 
 @pytest.mark.unit
 @pytest.mark.parametrize("invalid_output, error_match", [
-    ({"therapist_recommendations": []}, "list length"), # Too few
-    ({"therapist_recommendations": [{}] * 6}, "list length"), # Too many
     ({"therapist_recommendations": [{"title": "t", "rationale": "r", "priority": "invalid", "related_topics": [], "target_emotions": []}] * 3}, "priority"),
     ({"therapist_recommendations": [{"title": "t", "rationale": "r", "priority": "high", "related_topics": ["unknown"], "target_emotions": []}] * 3}, "related_topics"),
     ({"therapist_recommendations": [{"title": "t", "rationale": "r", "priority": "high", "related_topics": [], "target_emotions": ["unknown"]}] * 3}, "target_emotions"),

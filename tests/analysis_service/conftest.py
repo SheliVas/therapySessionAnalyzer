@@ -1,5 +1,5 @@
 import pytest
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Callable
 
 from src.transcription_service.domain import TranscriptCreatedEvent
 from src.analysis_service.domain import (
@@ -19,14 +19,22 @@ class FakeAnalysisBackend(AnalysisBackend):
         self.video_id = video_id
         self.calls: list[str] = []
 
-    def analyze(self, transcript_text: str, video_id: str) -> AnalysisResult:
+    def analyze(
+        self, 
+        transcript_text: str, 
+        video_id: str, 
+        on_progress: Optional[Callable[[AnalysisResult], None]] = None
+    ) -> AnalysisResult:
         self.calls.append(transcript_text)
         word_count = len(transcript_text.split())
-        return AnalysisResult(
+        result = AnalysisResult(
             video_id=self.video_id,
             word_count=word_count,
             analysis={"backend": "fake"}
         )
+        if on_progress:
+            on_progress(result)
+        return result
 
 
 class FakeAnalysisEventPublisher(AnalysisEventPublisher):

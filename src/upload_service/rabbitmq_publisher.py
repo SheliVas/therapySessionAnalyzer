@@ -17,6 +17,7 @@ class RabbitMQVideoEventPublisher(VideoEventPublisher):
             host=self._config.host,
             port=self._config.port,
             credentials=credentials,
+            heartbeat=0,
         )
 
         connection = pika.BlockingConnection(parameters)

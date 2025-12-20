@@ -23,7 +23,7 @@ class GeminiLLMClient(LLMClient):
         api_key: str,
         model: str = "gemini-2.5-flash",
         base_url: str = "https://generativelanguage.googleapis.com",
-        timeout: float = 30.0,
+        timeout: float = 180.0,
     ):
         if not api_key:
             raise ValueError("API key must be provided for GeminiLLMClient")
@@ -83,20 +83,44 @@ class GeminiLLMClient(LLMClient):
         url = f"{self.base_url}/v1beta/models/{self.model}:generateContent"
         started_at = time.perf_counter()
         logger.info("llm_client.request.start model=%s", self.model)
+        
+        max_retries = 5
+        base_delay = 2.0
+        
         with httpx.Client(timeout=self.timeout) as client:
-            response = client.post(
-                url,
-                headers=headers,
-                json=payload,
-            )
-            response.raise_for_status()
-            data = response.json()
-            logger.info(
-                "llm_client.request.success model=%s status=%s duration=%.2fs",
-                self.model,
-                response.status_code,
-                time.perf_counter() - started_at,
-            )
+            for attempt in range(max_retries):
+                try:
+                    response = client.post(
+                        url,
+                        headers=headers,
+                        json=payload,
+                    )
+                    response.raise_for_status()
+                    data = response.json()
+                    logger.info(
+                        "llm_client.request.success model=%s status=%s duration=%.2fs",
+                        self.model,
+                        response.status_code,
+                        time.perf_counter() - started_at,
+                    )
+                    break
+                except httpx.HTTPStatusError as e:
+                    if e.response.status_code == 429:
+                        if attempt == max_retries - 1:
+                            logger.error("llm_client.request.failed_max_retries model=%s error=%s", self.model, e)
+                            raise
+                        
+                        delay = base_delay * (2 ** attempt)
+                        logger.warning(
+                            "llm_client.request.rate_limited model=%s attempt=%d/%d delay=%.2fs",
+                            self.model,
+                            attempt + 1,
+                            max_retries,
+                            delay,
+                        )
+                        time.sleep(delay)
+                    else:
+                        raise
 
         try:
             raw_text = data["candidates"][0]["content"]["parts"][0]["text"]

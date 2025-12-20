@@ -91,7 +91,7 @@ def test_should_publish_exactly_one_event_equal_to_returned_event(
     assert actual_event == expected_event
 
 
-def test_should_save_exactly_one_event_equal_to_returned_event(
+def test_should_save_at_least_one_event_equal_to_returned_event(
     event: TranscriptCreatedEvent,
     fake_backend: FakeAnalysisBackend,
     fake_publisher: FakeAnalysisEventPublisher,
@@ -101,11 +101,10 @@ def test_should_save_exactly_one_event_equal_to_returned_event(
 ) -> None:
     result = process_transcript_created_event(event, fake_backend, fake_publisher, fake_repository, fake_storage_client, fake_videos_repository)
 
-    expected_count = 1
     actual_count = len(fake_repository.saved_events)
-    assert actual_count == expected_count
+    assert actual_count >= 1
 
     expected_event = result
-    actual_event = fake_repository.saved_events[0]
+    actual_event = fake_repository.saved_events[-1]
     assert actual_event == expected_event
 

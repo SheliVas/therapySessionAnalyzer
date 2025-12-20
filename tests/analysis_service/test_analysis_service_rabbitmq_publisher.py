@@ -53,6 +53,7 @@ def test_should_connect_with_correct_parameters(
     assert params.port == config.port
     assert params.credentials.username == config.username
     assert params.credentials.password == config.password
+    assert params.heartbeat == 0
 
 
 @pytest.mark.unit

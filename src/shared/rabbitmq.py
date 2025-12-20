@@ -43,6 +43,7 @@ class RabbitMQPublisherBase(ABC):
             host=self._config.host,
             port=self._config.port,
             credentials=credentials,
+            heartbeat=0,
         )
         
         connection = pika.BlockingConnection(parameters)
@@ -99,6 +100,7 @@ class RabbitMQConsumerBase(ABC):
             host=self._config.host,
             port=self._config.port,
             credentials=credentials,
+            heartbeat=0,
         )
         
         connection = pika.BlockingConnection(parameters)

@@ -48,6 +48,7 @@ def test_should_connect_with_correct_parameters(
     assert params.port == config.port
     assert params.credentials.username == config.username
     assert params.credentials.password == config.password
+    assert params.heartbeat == 0
 
 
 def test_should_declare_queue_with_correct_name_and_durable(

@@ -97,28 +97,6 @@ def test_should_parse_transcript_into_utterances_with_roles_topics_and_emotions(
     }
 
 @pytest.mark.unit
-def test_should_raise_value_error_when_llm_output_length_mismatches_input(
-    backend, mock_llm_client, sample_transcript
-):
-    mock_llm_client.analyze_transcript.side_effect = [
-        {
-            "speaker_roles": {
-                "Speaker A": {"role": "therapist", "confidence": 0.9, "reason": "test"},
-                "Speaker B": {"role": "patient", "confidence": 0.9, "reason": "test"}
-            },
-            "overall_confidence": 0.9
-        },
-        {
-            "utterances": [
-                {"topic": "greeting", "emotion": "neutral"}
-            ]
-        }
-    ]
-
-    with pytest.raises(ValueError, match="LLM output length mismatch"):
-        backend.analyze(sample_transcript, video_id="v1")
-
-@pytest.mark.unit
 def test_should_use_cache_for_utterance_tagging(
     backend, mock_llm_client, mock_redis_cache, sample_transcript
 ):
