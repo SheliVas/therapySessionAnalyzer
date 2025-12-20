@@ -57,7 +57,7 @@ def map_speakers_to_roles(
 
     def _call_llm() -> Any:
         prompt_text = _build_prompt(utterances=utterances)
-        return llm_client.analyze_transcript(prompt_text)
+        return llm_client.analyze_transcript({"user": prompt_text})
 
     def _validate(result: Any) -> dict[str, Any]:
         return validate_speaker_role_mapping_output(result, speaker_labels=speaker_labels)

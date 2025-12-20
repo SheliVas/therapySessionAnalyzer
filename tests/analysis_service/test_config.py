@@ -12,7 +12,8 @@ def test_should_load_analysis_config_from_env_vars(mocker):
         "REDIS_DB": "1",
         "REDIS_PASSWORD": "secret-redis",
         "REDIS_TTL": "7200",
-        "LLM_PROMPT_ID": "v2"
+        "LLM_PROMPT_ID": "v2",
+        "GEMINI_API_KEY": "test-api-key"
     })
     
     config = load_config()

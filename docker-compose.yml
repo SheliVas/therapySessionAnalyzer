@@ -158,7 +158,7 @@ services:
       MINIO_ACCESS_KEY: minioadmin
       MINIO_SECRET_KEY: minioadmin
       MINIO_SECURE: "false"
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
     volumes:
       - ./data:/app/data
 
@@ -174,5 +174,4 @@ services:
       MONGO_DB: therapy_analysis
     ports:
       - "8001:8001"
-
 

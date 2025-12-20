@@ -50,10 +50,10 @@ def generate_therapist_recommendations(
             INPUT_JSON_PLACEHOLDER, normalized_utterances
         )
         
-        prompt = json.dumps({
+        prompt = {
             "system": THERAPIST_RECOMMENDATIONS_SYSTEM_PROMPT,
             "user": user_message
-        })
+        }
 
         return llm_client.analyze_transcript(prompt)
 

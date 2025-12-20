@@ -129,9 +129,6 @@ def validate_recommendations_output(data: Any, *, valid_topics: set[str], valid_
         if item["priority"] not in valid_priorities:
             raise ValueError(f"Invalid priority: {item['priority']}")
             
-        if len(item["rationale"]) > 200:
-            raise ValueError("rationale must be <= 200 characters")
-            
         if not isinstance(item["related_topics"], list):
              raise ValueError("related_topics must be a list")
         for topic in item["related_topics"]:

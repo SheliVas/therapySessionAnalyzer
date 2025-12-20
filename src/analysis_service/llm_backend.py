@@ -125,7 +125,7 @@ class LLMAnalysisBackend(AnalysisBackend):
             # Create a stable hash of the input utterances for caching
             utterances_json = json.dumps(utterances, sort_keys=True)
             prompt = UTTERANCE_TAGGING_PROMPT_TEMPLATE.replace(UTTERANCES_PLACEHOLDER, utterances_json)
-            return self.llm_client.analyze_transcript(prompt)
+            return self.llm_client.analyze_transcript({"user": prompt})
 
         def _validate(result: Any) -> Dict[str, Any]:
             return validate_utterance_tagging_output(result, expected_length=len(utterances))

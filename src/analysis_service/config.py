@@ -16,9 +16,9 @@ class RedisConfig(BaseModel):
 
 class LLMConfig(BaseModel):
     api_key: Optional[str] = None
-    model: str = "gpt-5-mini"
-    base_url: str = "https://api.openai.com/v1"
-    timeout: float = 30.0
+    model: str = "gemini-2.5-flash"
+    base_url: str = "https://generativelanguage.googleapis.com"
+    timeout: float = 180.0
 
 
 class AnalysisServiceConfig(BaseModel):
@@ -51,10 +51,12 @@ def load_config() -> AnalysisServiceConfig:
 
     llm_prompt_id = os.getenv("LLM_PROMPT_ID", "v1")
 
-    llm_api_key = os.getenv("OPENAI_API_KEY") or os.getenv("LLM_API_KEY")
-    llm_model = os.getenv("LLM_MODEL", "gpt-5-mini")
-    llm_base_url = os.getenv("LLM_BASE_URL", "https://api.openai.com/v1")
-    llm_timeout = float(os.getenv("LLM_TIMEOUT", "6000.0"))
+    llm_api_key = os.getenv("GEMINI_API_KEY") or os.getenv("LLM_API_KEY")
+    if not llm_api_key:
+        raise ValueError("GEMINI_API_KEY must be provided for the analysis service")
+    llm_model = os.getenv("LLM_MODEL", "gemini-2.5-flash")
+    llm_base_url = os.getenv("LLM_BASE_URL", "https://generativelanguage.googleapis.com")
+    llm_timeout = float(os.getenv("LLM_TIMEOUT", "180.0"))
 
     consumer_config = RabbitMQConsumerConfig(
         host=host,
