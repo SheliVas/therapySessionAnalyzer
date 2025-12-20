@@ -26,7 +26,7 @@ def test_should_return_videos_list_as_json(client, sample_videos):
 @pytest.mark.unit
 def test_should_not_return_non_analyzed_videos(fake_repository):
     fake_repository.videos.append(
-        VideoSummary(video_id="video-3", word_count=0, status="uploaded", extra={})
+        VideoSummary(video_id="video-3", word_count=0, status="uploaded", analysis={})
     )
     app = create_app(fake_repository)
     client = TestClient(app)
@@ -39,11 +39,11 @@ def test_should_not_return_non_analyzed_videos(fake_repository):
 
 
 @pytest.mark.unit
-@pytest.mark.parametrize("video_id,expected_word_count,expected_status,expected_extra", [
-    ("video-1", 10, "analyzed", {"foo": "bar", "recommendations": [{"title": "Rec 1", "priority": "high"}]}),
-    ("video-2", 20, "analyzed", {"foo": "baz", "recommendations": [{"title": "Rec 2", "priority": "low"}]}),
+@pytest.mark.parametrize("video_id,expected_word_count,expected_status,expected_analysis", [
+    ("video-1", 10, "analyzed", {"foo": "bar", "recommendations": {"therapist_recommendations": [{"title": "Rec 1", "priority": "high"}]}}),
+    ("video-2", 20, "analyzed", {"foo": "baz", "recommendations": {"therapist_recommendations": [{"title": "Rec 2", "priority": "low"}]}}),
 ])
-def test_should_return_video_data(client, sample_videos, video_id, expected_word_count, expected_status, expected_extra):
+def test_should_return_video_data(client, sample_videos, video_id, expected_word_count, expected_status, expected_analysis):
 
     response = client.get("/videos")
     data = response.json()
@@ -53,4 +53,4 @@ def test_should_return_video_data(client, sample_videos, video_id, expected_word
     assert video is not None
     assert video["word_count"] == expected_word_count
     assert video["status"] == expected_status
-    assert video["extra"] == expected_extra
+    assert video["analysis"] == expected_analysis

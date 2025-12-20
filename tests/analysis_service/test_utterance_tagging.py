@@ -37,7 +37,6 @@ def sample_transcript():
 def test_should_parse_transcript_into_utterances_with_roles_topics_and_emotions(
     backend, mock_llm_client, sample_transcript
 ):
-    # Mock speaker role mapping
     mock_llm_client.analyze_transcript.side_effect = [
         # First call: speaker role mapping
         {
@@ -67,8 +66,9 @@ def test_should_parse_transcript_into_utterances_with_roles_topics_and_emotions(
 
     result = backend.analyze(sample_transcript, video_id="v1")
 
-    assert "utterances" in result.extra
-    utterances = result.extra["utterances"]
+    assert "tagging" in result.analysis
+    assert "utterances" in result.analysis["tagging"]
+    utterances = result.analysis["tagging"]["utterances"]
     assert len(utterances) == 3
     
     assert utterances[0] == {
@@ -100,9 +100,7 @@ def test_should_parse_transcript_into_utterances_with_roles_topics_and_emotions(
 def test_should_raise_value_error_when_llm_output_length_mismatches_input(
     backend, mock_llm_client, sample_transcript
 ):
-    # Mock speaker role mapping
     mock_llm_client.analyze_transcript.side_effect = [
-        # First call: speaker role mapping
         {
             "speaker_roles": {
                 "Speaker A": {"role": "therapist", "confidence": 0.9, "reason": "test"},
@@ -110,7 +108,6 @@ def test_should_raise_value_error_when_llm_output_length_mismatches_input(
             },
             "overall_confidence": 0.9
         },
-        # Second call: utterance tagging (mismatched length)
         {
             "utterances": [
                 {"topic": "greeting", "emotion": "neutral"}
@@ -125,7 +122,6 @@ def test_should_raise_value_error_when_llm_output_length_mismatches_input(
 def test_should_use_cache_for_utterance_tagging(
     backend, mock_llm_client, mock_redis_cache, sample_transcript
 ):
-    # Mock speaker role mapping (not cached for this test)
     mock_llm_client.analyze_transcript.side_effect = [
         {
             "speaker_roles": {
@@ -134,7 +130,6 @@ def test_should_use_cache_for_utterance_tagging(
             },
             "overall_confidence": 0.9
         },
-        # Recommendations (since tagging is cached, this is the next LLM call)
         {
             "therapist_recommendations": [
                 {"title": "Rec 1", "rationale": "Rationale 1", "priority": "high", "related_topics": ["greeting"], "target_emotions": ["neutral"]},
@@ -144,7 +139,6 @@ def test_should_use_cache_for_utterance_tagging(
         }
     ]
     
-    # Mock cache hit for utterance tagging
     mock_redis_cache.get.side_effect = [
         None, # Cache miss for speaker role mapping
         {
@@ -159,8 +153,7 @@ def test_should_use_cache_for_utterance_tagging(
 
     result = backend.analyze(sample_transcript, video_id="v1")
 
-    assert len(result.extra["utterances"]) == 3
-    # Verify LLM was called twice (mapping + recommendations)
+    assert len(result.analysis["tagging"]["utterances"]) == 3
     assert mock_llm_client.analyze_transcript.call_count == 2
 
 @pytest.mark.unit
@@ -168,7 +161,6 @@ def test_should_raise_value_error_when_llm_returns_invalid_format(
     backend, mock_llm_client, sample_transcript
 ):
     mock_llm_client.analyze_transcript.side_effect = [
-        # Speaker mapping
         {
             "speaker_roles": {
                 "Speaker A": {"role": "therapist", "confidence": 0.9, "reason": "test"},
@@ -189,7 +181,6 @@ def test_should_handle_transcript_with_extra_whitespace_and_empty_lines(
 ):
     transcript = "\n\nSpeaker A: Hello\n\n\nSpeaker B: Hi\n   \n"
     mock_llm_client.analyze_transcript.side_effect = [
-        # Speaker mapping
         {
             "speaker_roles": {
                 "Speaker A": {"role": "therapist", "confidence": 0.9, "reason": "test"},
@@ -197,14 +188,12 @@ def test_should_handle_transcript_with_extra_whitespace_and_empty_lines(
             },
             "overall_confidence": 0.9
         },
-        # Utterance tagging
         {
             "utterances": [
                 {"topic": "greeting", "emotion": "neutral"},
                 {"topic": "greeting", "emotion": "neutral"}
             ]
         },
-        # Recommendations
         {
             "therapist_recommendations": [
                 {"title": "Rec 1", "rationale": "Rationale 1", "priority": "high", "related_topics": ["greeting"], "target_emotions": ["neutral"]},
@@ -215,4 +204,4 @@ def test_should_handle_transcript_with_extra_whitespace_and_empty_lines(
     ]
 
     result = backend.analyze(transcript, video_id="v1")
-    assert len(result.extra["utterances"]) == 2
+    assert len(result.analysis["tagging"]["utterances"]) == 2

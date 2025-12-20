@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 class AnalysisCompletedEvent(BaseModel):
     video_id: str
     word_count: int
-    extra: dict = {}
+    analysis: dict = {}
 
 
 class AnalysisEventPublisher(ABC):
@@ -62,7 +62,7 @@ def process_transcript_created_event(
     completed_event = AnalysisCompletedEvent(
         video_id=analysis_result.video_id,
         word_count=analysis_result.word_count,
-        extra=analysis_result.extra,
+        analysis=analysis_result.analysis,
     )
     
     videos_repository.mark_analyzed(analysis_result.video_id, analysis_result.word_count)

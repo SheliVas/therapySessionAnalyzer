@@ -57,7 +57,7 @@ def test_should_return_analysis_completed_event_with_correct_word_count(
     assert actual_word_count == expected_word_count
 
 
-def test_should_return_analysis_completed_event_with_correct_extra_data(
+def test_should_return_analysis_completed_event_with_correct_analysis_data(
     event: TranscriptCreatedEvent,
     fake_backend: FakeAnalysisBackend,
     fake_publisher: FakeAnalysisEventPublisher,
@@ -67,9 +67,9 @@ def test_should_return_analysis_completed_event_with_correct_extra_data(
 ) -> None:
     result = process_transcript_created_event(event, fake_backend, fake_publisher, fake_repository, fake_storage_client, fake_videos_repository)
 
-    expected_extra = {"backend": "fake"}
-    actual_extra = result.extra
-    assert actual_extra == expected_extra
+    expected_analysis = {"backend": "fake"}
+    actual_analysis = result.analysis
+    assert actual_analysis == expected_analysis
 
 
 def test_should_publish_exactly_one_event_equal_to_returned_event(

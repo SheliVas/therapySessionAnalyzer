@@ -27,7 +27,7 @@ def event() -> AnalysisCompletedEvent:
     return AnalysisCompletedEvent(
         video_id="video-123",
         word_count=42,
-        extra={"sentiment": "positive"},
+        analysis={"sentiment": "positive"},
     )
 
 
@@ -96,7 +96,7 @@ def test_should_publish_event_as_json_to_correct_queue(
     body_dict = json.loads(call_kwargs.get("body"))
     assert body_dict["video_id"] == event.video_id
     assert body_dict["word_count"] == event.word_count
-    assert body_dict["extra"] == event.extra
+    assert body_dict["analysis"] == event.analysis
 
 
 @pytest.mark.unit

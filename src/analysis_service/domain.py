@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 class AnalysisResult(BaseModel):
     video_id: str
     word_count: int
-    extra: dict = {}
+    analysis: dict = {}
 
 
 class StorageClient(Protocol):
@@ -63,7 +63,7 @@ def analyze_transcript(
         result = AnalysisResult(
             video_id=event.video_id,
             word_count=result.word_count,
-            extra=result.extra,
+            analysis=result.analysis,
         )
     logger.info(
         "analysis.completed video_id=%s word_count=%d",

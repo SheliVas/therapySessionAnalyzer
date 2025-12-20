@@ -48,7 +48,7 @@ class LLMAnalysisBackend(AnalysisBackend):
             video_id: The ID of the video being analyzed.
         
         Returns:
-            AnalysisResult with word_count and extra containing utterances.
+            AnalysisResult with word_count and analysis containing tagging and recommendations.
         """
         started_at = time.perf_counter()
         logger.info("llm_backend.analyze.start video_id=%s", video_id)
@@ -66,7 +66,10 @@ class LLMAnalysisBackend(AnalysisBackend):
             return AnalysisResult(
                 video_id=video_id,
                 word_count=word_count,
-                extra={"utterances": []}
+                analysis={
+                    "tagging": {"utterances": []},
+                    "recommendations": {"therapist_recommendations": []}
+                }
             )
 
         role_mapping_result = map_speakers_to_roles(
@@ -105,8 +108,10 @@ class LLMAnalysisBackend(AnalysisBackend):
         return AnalysisResult(
             video_id=video_id,
             word_count=word_count,
-            extra={
-                "utterances": tagged_utterances, # TODO: see if we only need patient utterances
+            analysis={
+                "tagging": {
+                    "utterances": tagged_utterances,
+                },
                 "recommendations": recommendations,
             }
         )

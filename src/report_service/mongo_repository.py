@@ -5,7 +5,7 @@ class VideoSummary(BaseModel):
     video_id: str
     word_count: int
     status: str
-    extra: dict
+    analysis: dict
 
 
 class MongoReportRepository:
@@ -32,7 +32,7 @@ class MongoReportRepository:
                     "video_id": 1,
                     "status": 1,
                     "word_count": "$analysis.word_count",
-                    "extra": "$analysis.extra"
+                    "analysis": "$analysis.analysis"
                 }
             }
         ]
@@ -52,5 +52,5 @@ class MongoReportRepository:
             video_id=video_id,
             status=video_doc["status"],
             word_count=analysis_doc["word_count"],
-            extra=analysis_doc["extra"]
+            analysis=analysis_doc["analysis"]
         )

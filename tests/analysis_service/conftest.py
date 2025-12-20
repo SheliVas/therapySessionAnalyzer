@@ -32,7 +32,7 @@ class FakeAnalysisBackend(AnalysisBackend):
         return AnalysisResult(
             video_id=self.video_id,
             word_count=word_count,
-            extra={"backend": "fake"}
+            analysis={"backend": "fake"}
         )
 
 

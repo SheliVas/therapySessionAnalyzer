@@ -12,7 +12,7 @@ def repository(mongo_client: mongomock.MongoClient) -> MongoAnalysisRepository:
 
 class TestMongoAnalysisRepository:
 
-    @pytest.mark.parametrize("video_id, word_count, extra", [
+    @pytest.mark.parametrize("video_id, word_count, analysis", [
         ("video-123", 42, {"foo": "bar"}),
         ("video-zero", 0, {}),
         ("video-complex", 1000, {"nested": {"a": 1}, "list": [1, 2]}),
@@ -22,12 +22,12 @@ class TestMongoAnalysisRepository:
         repository: MongoAnalysisRepository,
         video_id: str,
         word_count: int,
-        extra: dict,
+        analysis: dict,
     ) -> None:
         event = AnalysisCompletedEvent(
             video_id=video_id,
             word_count=word_count,
-            extra=extra,
+            analysis=analysis,
         )
         
         repository.save_analysis(event)
@@ -36,7 +36,7 @@ class TestMongoAnalysisRepository:
         assert result is not None
         assert result.video_id == video_id
         assert result.word_count == word_count
-        assert result.extra == extra
+        assert result.analysis == analysis
 
     def test_should_return_none_when_event_not_found(
         self,
@@ -54,12 +54,12 @@ class TestMongoAnalysisRepository:
         event_v1 = AnalysisCompletedEvent(
             video_id="video-123",
             word_count=10,
-            extra={"version": 1},
+            analysis={"version": 1},
         )
         event_v2 = AnalysisCompletedEvent(
             video_id="video-123",
             word_count=99,
-            extra={"version": 2},
+            analysis={"version": 2},
         )
 
         repository.save_analysis(event_v1)
@@ -71,4 +71,4 @@ class TestMongoAnalysisRepository:
         assert doc_count == 1
         assert result is not None
         assert result.word_count == 99
-        assert result.extra == {"version": 2}
+        assert result.analysis == {"version": 2}

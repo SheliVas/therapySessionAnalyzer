@@ -22,13 +22,13 @@ def sample_videos() -> list[VideoSummary]:
             video_id="video-1", 
             word_count=10, 
             status="analyzed", 
-            extra={"foo": "bar", "recommendations": [{"title": "Rec 1", "priority": "high"}]}
+            analysis={"foo": "bar", "recommendations": {"therapist_recommendations": [{"title": "Rec 1", "priority": "high"}]}}
         ),
         VideoSummary(
             video_id="video-2", 
             word_count=20, 
             status="analyzed", 
-            extra={"foo": "baz", "recommendations": [{"title": "Rec 2", "priority": "low"}]}
+            analysis={"foo": "baz", "recommendations": {"therapist_recommendations": [{"title": "Rec 2", "priority": "low"}]}}
         ),
     ]
 

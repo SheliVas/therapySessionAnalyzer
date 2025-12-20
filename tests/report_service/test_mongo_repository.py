@@ -9,33 +9,37 @@ def sample_documents():
             {
                 "video_id": "video-1",
                 "word_count": 10,
-                "extra": {
+                "analysis": {
                     "foo": "bar",
-                    "recommendations": [
-                        {
-                            "title": "Rec 1",
-                            "rationale": "Rat 1",
-                            "priority": "high",
-                            "related_topics": ["topic1"],
-                            "target_emotions": ["emotion1"]
-                        }
-                    ]
+                    "recommendations": {
+                        "therapist_recommendations": [
+                            {
+                                "title": "Rec 1",
+                                "rationale": "Rat 1",
+                                "priority": "high",
+                                "related_topics": ["topic1"],
+                                "target_emotions": ["emotion1"]
+                            }
+                        ]
+                    }
                 }
             },
             {
                 "video_id": "video-2",
                 "word_count": 20,
-                "extra": {
+                "analysis": {
                     "foo": "baz",
-                    "recommendations": [
-                        {
-                            "title": "Rec 2",
-                            "rationale": "Rat 2",
-                            "priority": "low",
-                            "related_topics": ["topic2"],
-                            "target_emotions": ["emotion2"]
-                        }
-                    ]
+                    "recommendations": {
+                        "therapist_recommendations": [
+                            {
+                                "title": "Rec 2",
+                                "rationale": "Rat 2",
+                                "priority": "low",
+                                "related_topics": ["topic2"],
+                                "target_emotions": ["emotion2"]
+                            }
+                        ]
+                    }
                 }
             }
         ],
@@ -74,30 +78,34 @@ def test_should_list_only_analyzed_videos(repository_with_data):
 
 
 @pytest.mark.unit
-@pytest.mark.parametrize("video_id, expected_word_count, expected_status, expected_extra", [
+@pytest.mark.parametrize("video_id, expected_word_count, expected_status, expected_analysis", [
     ("video-1", 10, "analyzed", {
         "foo": "bar",
-        "recommendations": [
-            {
-                "title": "Rec 1",
-                "rationale": "Rat 1",
-                "priority": "high",
-                "related_topics": ["topic1"],
-                "target_emotions": ["emotion1"]
-            }
-        ]
+        "recommendations": {
+            "therapist_recommendations": [
+                {
+                    "title": "Rec 1",
+                    "rationale": "Rat 1",
+                    "priority": "high",
+                    "related_topics": ["topic1"],
+                    "target_emotions": ["emotion1"]
+                }
+            ]
+        }
     }),
     ("video-2", 20, "analyzed", {
         "foo": "baz",
-        "recommendations": [
-            {
-                "title": "Rec 2",
-                "rationale": "Rat 2",
-                "priority": "low",
-                "related_topics": ["topic2"],
-                "target_emotions": ["emotion2"]
-            }
-        ]
+        "recommendations": {
+            "therapist_recommendations": [
+                {
+                    "title": "Rec 2",
+                    "rationale": "Rat 2",
+                    "priority": "low",
+                    "related_topics": ["topic2"],
+                    "target_emotions": ["emotion2"]
+                }
+            ]
+        }
     }),
 ])
 def test_should_contain_correct_video_summaries(
@@ -105,7 +113,7 @@ def test_should_contain_correct_video_summaries(
     video_id, 
     expected_word_count, 
     expected_status,
-    expected_extra
+    expected_analysis
 ):
     videos = repository_with_data.list_videos()
     video = next((v for v in videos if v.video_id == video_id), None)
@@ -113,7 +121,7 @@ def test_should_contain_correct_video_summaries(
     assert video is not None
     assert video.word_count == expected_word_count
     assert video.status == expected_status
-    assert video.extra == expected_extra
+    assert video.analysis == expected_analysis
 
 
 @pytest.mark.unit
@@ -132,8 +140,8 @@ def test_should_return_video_summary_when_video_exists(repository_with_data):
     assert video.video_id == "video-1"
     assert video.word_count == 10
     assert video.status == "analyzed"
-    assert video.extra["foo"] == "bar"
-    assert "recommendations" in video.extra
+    assert video.analysis["foo"] == "bar"
+    assert "recommendations" in video.analysis
 
 
 @pytest.mark.unit
@@ -144,11 +152,11 @@ def test_should_return_none_when_video_does_not_exist(repository_with_data):
 
 
 @pytest.mark.unit
-def test_should_return_recommendations_in_extra(repository_with_data):
+def test_should_return_recommendations_in_analysis(repository_with_data):
     video = repository_with_data.get_video("video-1")
     
     assert video is not None
-    assert "recommendations" in video.extra
-    assert len(video.extra["recommendations"]) == 1
-    assert video.extra["recommendations"][0]["title"] == "Rec 1"
-    assert video.extra["recommendations"][0]["priority"] == "high"
+    assert "recommendations" in video.analysis
+    assert len(video.analysis["recommendations"]["therapist_recommendations"]) == 1
+    assert video.analysis["recommendations"]["therapist_recommendations"][0]["title"] == "Rec 1"
+    assert video.analysis["recommendations"]["therapist_recommendations"][0]["priority"] == "high"

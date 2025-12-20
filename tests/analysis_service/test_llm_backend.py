@@ -92,11 +92,11 @@ def test_should_include_word_count_in_result(
 
 
 @pytest.mark.unit
-def test_should_include_utterances_in_extra(
+def test_should_include_utterances_in_analysis(
     backend: LLMAnalysisBackend,
     fake_llm_client: FakeLLMClient,
 ) -> None:
-    """extra should contain utterances."""
+    """analysis should contain tagging.utterances."""
     transcript = "Speaker A: Hello\nSpeaker B: Hi"
     fake_llm_client.side_effect = [
         {"speaker_roles": {"Speaker A": {"role": "therapist", "confidence": 0.9, "reason": "test"}, "Speaker B": {"role": "patient", "confidence": 0.9, "reason": "test"}}, "overall_confidence": 0.9},
@@ -105,16 +105,17 @@ def test_should_include_utterances_in_extra(
     ]
     result = backend.analyze(transcript, video_id="v1")
     
-    assert "utterances" in result.extra
-    assert len(result.extra["utterances"]) == 2
+    assert "tagging" in result.analysis
+    assert "utterances" in result.analysis["tagging"]
+    assert len(result.analysis["tagging"]["utterances"]) == 2
 
 
 @pytest.mark.unit
-def test_extra_contains_utterances(
+def test_analysis_contains_utterances(
     backend: LLMAnalysisBackend,
     fake_llm_client: FakeLLMClient,
 ) -> None:
-    """extra dict should contain utterances."""
+    """analysis dict should contain tagging.utterances."""
     transcript = "Speaker A: Hello\nSpeaker B: Hi"
     fake_llm_client.side_effect = [
         {"speaker_roles": {"Speaker A": {"role": "therapist", "confidence": 0.9, "reason": "test"}, "Speaker B": {"role": "patient", "confidence": 0.9, "reason": "test"}}, "overall_confidence": 0.9},
@@ -123,9 +124,10 @@ def test_extra_contains_utterances(
     ]
     result = backend.analyze(transcript, video_id="v1")
     
-    assert "utterances" in result.extra
-    assert isinstance(result.extra["utterances"], list)
-    assert len(result.extra["utterances"]) == 2
+    assert "tagging" in result.analysis
+    assert "utterances" in result.analysis["tagging"]
+    assert isinstance(result.analysis["tagging"]["utterances"], list)
+    assert len(result.analysis["tagging"]["utterances"]) == 2
 
 
 @pytest.mark.unit

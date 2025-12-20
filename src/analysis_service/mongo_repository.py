@@ -24,7 +24,7 @@ class MongoAnalysisRepository:
                 "$set": {
                     "video_id": event.video_id,
                     "word_count": event.word_count,
-                    "extra": event.extra,
+                    "analysis": event.analysis,
                 }
             },
             upsert=True,
@@ -45,6 +45,6 @@ class MongoAnalysisRepository:
         return AnalysisCompletedEvent(
             video_id=doc["video_id"],
             word_count=doc["word_count"],
-            extra=doc["extra"],
+            analysis=doc["analysis"],
         )
 
