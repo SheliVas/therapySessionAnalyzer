@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+#
+# pre-push: run the FULL test suite before any push.
+# This is the local mirror of the CI gate; CI is still the authoritative
+# check that blocks merges (see .github/workflows/tests.yml).
+#
+# Bypass in an emergency with:  git push --no-verify
+set -euo pipefail
+
+echo "pre-push: running full test suite"
+exec python -m pytest -q
