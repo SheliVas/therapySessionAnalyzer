@@ -1,10 +1,8 @@
 import os
-from dataclasses import dataclass
 from pydantic import BaseModel
 
 
-@dataclass
-class MinIOConfig:
+class MinIOConfig(BaseModel):
     """Configuration for MinIO storage client."""
     endpoint: str
     access_key: str
@@ -13,8 +11,7 @@ class MinIOConfig:
     secure: bool = False
 
 
-@dataclass
-class MongoConfig:
+class MongoConfig(BaseModel):
     """Configuration for MongoDB connection."""
     uri: str
     db_name: str = "therapy_analysis"
