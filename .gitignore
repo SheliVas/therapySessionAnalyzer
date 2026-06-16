@@ -131,12 +131,18 @@ secrets.*
 
 # Copilot instructions (generated)
 .github/copilot-instructions.md
+
+# Assignment / demo materials
 assignment.md
+DEMO_INSTRUCTIONS.md
+demo_script.py
 sample.mp4
 long_sample.mp4
-.gitignore
-DEMO_INSTRUCTIONS.md
-.gitignore
-.gitignore
-demo_script.py
 long sample.mp4
+ex01_demo.mov
+
+# Interview prep / collaboration docs (not for commit)
+docs/interview_prep/
+
+# Runtime flow data (MinIO object storage, regenerated each run)
+data/
