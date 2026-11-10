@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+#
+# pre-commit: run the test suite for the service(s) whose code is staged.
+#
+# Mapping: src/<name>_service/ or tests/<name>_service/  ->  tests/<name>_service/
+# A change to shared code (src/shared/), the test harness (tests/conftest.py,
+# tests/fakes.py), or global config (pytest.ini, requirements.txt) runs the
+# WHOLE suite, since those affect every service.
+#
+# Bypass in an emergency with:  git commit --no-verify
+set -euo pipefail
+
+changed=$(git diff --cached --name-only --diff-filter=ACM)
+[ -z "$changed" ] && exit 0
+
+# Global / shared changes -> full suite.
+if echo "$changed" | grep -qE '^(src/shared/|tests/conftest\.py|tests/fakes\.py|pytest\.ini|requirements\.txt)'; then
+    echo "pre-commit: shared/global change detected -> running full suite"
+    exec python -m pytest -q
+fi
+
+# Otherwise, find which *_service dirs were touched (in src/ or tests/).
+# `|| true` so a no-match grep (exit 1) doesn't trip `set -e`/`pipefail`.
+services=$(echo "$changed" \
+    | grep -oE '^(src|tests)/[a-z_]+_service/' \
+    | sed -E 's#^(src|tests)/##; s#/$##' \
+    | sort -u || true)
+
+if [ -z "$services" ]; then
+    echo "pre-commit: no service code staged -> skipping tests"
+    exit 0
+fi
+
+paths=""
+for svc in $services; do
+    if [ -d "tests/$svc" ]; then
+        paths="$paths tests/$svc"
+    fi
+done
+
+if [ -z "$paths" ]; then
+    echo "pre-commit: no matching test dirs -> skipping tests"
+    exit 0
+fi
+
+echo "pre-commit: running tests for ->$paths"
+exec python -m pytest -q $paths
